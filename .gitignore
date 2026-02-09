@@ -3,6 +3,10 @@
 # dependencies
 node_modules/
 
+# Next.js
+.next/
+out/
+
 # Expo
 .expo/
 dist/
@@ -35,6 +39,7 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+next-env.d.ts
 
 app-example
 

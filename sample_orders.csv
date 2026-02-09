@@ -1,0 +1,6 @@
+email,product_name,quantity,street,city,state,zipcode,payment_method,status,notes
+user@example.com,Fresh Bananas,2,123 Main Street,Mumbai,Maharashtra,400001,Cash on Delivery,pending,Deliver in morning
+user@example.com,Organic Tomatoes,1,123 Main Street,Mumbai,Maharashtra,400001,Cash on Delivery,pending,Deliver in morning
+customer@test.com,Fresh Milk,3,456 Park Avenue,Delhi,Delhi,110001,Online Payment,confirmed,Handle with care
+customer@test.com,Whole Wheat Bread,2,456 Park Avenue,Delhi,Delhi,110001,Online Payment,confirmed,Handle with care
+john@email.com,Orange Juice,1,789 Garden Road,Bangalore,Karnataka,560001,Cash on Delivery,pending,Call before delivery
