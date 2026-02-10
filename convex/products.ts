@@ -1,137 +1,71 @@
+import { query } from "./_generated/server";
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+
+// Hard-coded products list (no database table needed)
+const PRODUCTS = [
+  {
+    id: "PROD-001",
+    name: "Fresh Apples",
+    category: "Fruits",
+  },
+  {
+    id: "PROD-002",
+    name: "Bananas",
+    category: "Fruits",
+  },
+  {
+    id: "PROD-003",
+    name: "Milk",
+    category: "Dairy",
+  },
+  {
+    id: "PROD-004",
+    name: "Bread",
+    category: "Bakery",
+  },
+  {
+    id: "PROD-005",
+    name: "Eggs",
+    category: "Dairy",
+  },
+  {
+    id: "PROD-006",
+    name: "Tomatoes",
+    category: "Vegetables",
+  },
+  {
+    id: "PROD-007",
+    name: "Carrots",
+    category: "Vegetables",
+  },
+  {
+    id: "PROD-008",
+    name: "Cheese",
+    category: "Dairy",
+  },
+  {
+    id: "PROD-009",
+    name: "Chicken",
+    category: "Meat",
+  },
+  {
+    id: "PROD-010",
+    name: "Rice",
+    category: "Grains",
+  },
+];
 
 // Get all products
 export const list = query({
-  args: {
-    categoryId: v.optional(v.id("categories")),
-    featured: v.optional(v.boolean()),
-  },
-  handler: async (ctx, args) => {
-    let products;
-
-    if (args.categoryId) {
-      products = await ctx.db
-        .query("products")
-        .withIndex("by_category", (q) => q.eq("categoryId", args.categoryId!))
-        .filter((q) => q.eq(q.field("isActive"), true))
-        .collect();
-    } else if (args.featured !== undefined) {
-      products = await ctx.db
-        .query("products")
-        .withIndex("by_featured", (q) => q.eq("featured", args.featured!))
-        .filter((q) => q.eq(q.field("isActive"), true))
-        .collect();
-    } else {
-      products = await ctx.db
-        .query("products")
-        .filter((q) => q.eq(q.field("isActive"), true))
-        .collect();
-    }
-
-    return products;
+  handler: async () => {
+    return PRODUCTS;
   },
 });
 
 // Get product by ID
-export const get = query({
-  args: { id: v.id("products") },
+export const getById = query({
+  args: { id: v.string() },
   handler: async (ctx, args) => {
-    const product = await ctx.db.get(args.id);
-    if (!product) {
-      throw new Error("Product not found");
-    }
-    return product;
-  },
-});
-
-// Search products
-export const search = query({
-  args: { query: v.string() },
-  handler: async (ctx, args) => {
-    const products = await ctx.db.query("products").collect();
-    
-    const searchQuery = args.query.toLowerCase();
-    return products.filter(
-      (product) =>
-        product.isActive &&
-        (product.name.toLowerCase().includes(searchQuery) ||
-          product.description.toLowerCase().includes(searchQuery) ||
-          (product.tags && product.tags.some(tag => tag.toLowerCase().includes(searchQuery))))
-    );
-  },
-});
-
-// Create product (Admin only)
-export const create = mutation({
-  args: {
-    name: v.string(),
-    description: v.string(),
-    price: v.number(),
-    categoryId: v.id("categories"),
-    image: v.string(),
-    images: v.optional(v.array(v.string())),
-    stock: v.number(),
-    unit: v.string(),
-    featured: v.boolean(),
-    discount: v.optional(v.number()),
-    tags: v.optional(v.array(v.string())),
-  },
-  handler: async (ctx, args) => {
-    const productId = await ctx.db.insert("products", {
-      ...args,
-      isActive: true,
-    });
-    return productId;
-  },
-});
-
-// Update product (Admin only)
-export const update = mutation({
-  args: {
-    id: v.id("products"),
-    name: v.optional(v.string()),
-    description: v.optional(v.string()),
-    price: v.optional(v.number()),
-    categoryId: v.optional(v.id("categories")),
-    image: v.optional(v.string()),
-    images: v.optional(v.array(v.string())),
-    stock: v.optional(v.number()),
-    unit: v.optional(v.string()),
-    featured: v.optional(v.boolean()),
-    discount: v.optional(v.number()),
-    isActive: v.optional(v.boolean()),
-    tags: v.optional(v.array(v.string())),
-  },
-  handler: async (ctx, args) => {
-    const { id, ...updates } = args;
-    await ctx.db.patch(id, updates);
-    return id;
-  },
-});
-
-// Delete product (Admin only)
-export const remove = mutation({
-  args: { id: v.id("products") },
-  handler: async (ctx, args) => {
-    await ctx.db.delete(args.id);
-  },
-});
-
-// Update stock
-export const updateStock = mutation({
-  args: {
-    id: v.id("products"),
-    quantity: v.number(),
-  },
-  handler: async (ctx, args) => {
-    const product = await ctx.db.get(args.id);
-    if (!product) {
-      throw new Error("Product not found");
-    }
-    
-    await ctx.db.patch(args.id, {
-      stock: product.stock + args.quantity,
-    });
+    return PRODUCTS.find((p) => p.id === args.id) || null;
   },
 });

@@ -2,12 +2,13 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { ConvexClientProvider } from './providers';
+import { UserProvider } from '../components/UserContext';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'FreshCart - Fresh Groceries Delivered',
-  description: 'Order fresh groceries online with FreshCart',
+  title: 'Collection Point System',
+  description: 'Order products and collect from your nearest collection point',
 };
 
 export default function RootLayout({
@@ -18,7 +19,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <ConvexClientProvider>{children}</ConvexClientProvider>
+        <ConvexClientProvider>
+          <UserProvider>{children}</UserProvider>
+        </ConvexClientProvider>
       </body>
     </html>
   );
