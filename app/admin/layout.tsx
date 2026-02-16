@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import { useUserRole } from '@/components/UserContext';
 
-export default function StoreLayout({
+export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -13,19 +13,19 @@ export default function StoreLayout({
   const router = useRouter();
   const role = useUserRole();
 
-  // Redirect non-customers
+  // Redirect non-admins
   useEffect(() => {
-    if (role && role !== 'customer') {
-      if (role === 'admin') {
-        router.push('/admin');
-      } else if (role === 'collection_point_manager') {
+    if (role && role !== 'admin') {
+      if (role === 'collection_point_manager') {
         router.push('/collection-point');
+      } else {
+        router.push('/store');
       }
     }
   }, [role, router]);
 
-  // Don't render store pages for non-customers
-  if (role && role !== 'customer') {
+  // Don't render admin pages for non-admins
+  if (role && role !== 'admin') {
     return null;
   }
 

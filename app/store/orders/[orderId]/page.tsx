@@ -7,6 +7,20 @@ import { useRouter, useParams } from 'next/navigation';
 import { useUsername } from '../../../../components/UserContext';
 import { useEffect } from 'react';
 
+// Product image mapping
+const PRODUCT_IMAGES: Record<string, string> = {
+  'PROD-001': 'https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=400&h=400&fit=crop',
+  'PROD-002': 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=400&h=400&fit=crop',
+  'PROD-003': 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&h=400&fit=crop',
+  'PROD-004': 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=400&fit=crop',
+  'PROD-005': 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=400&h=400&fit=crop',
+  'PROD-006': 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400&h=400&fit=crop',
+  'PROD-007': 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=400&h=400&fit=crop',
+  'PROD-008': 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=400&h=400&fit=crop',
+  'PROD-009': 'https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=400&h=400&fit=crop',
+  'PROD-010': 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&h=400&fit=crop',
+};
+
 export default function OrderDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -94,32 +108,22 @@ export default function OrderDetailPage() {
         <h2 className="text-lg font-semibold text-gray-900 mb-6">Order Status Timeline</h2>
 
         <div className="space-y-6">
-          {/* Pending */}
+          {/* Confirmed */}
           <div className="flex gap-4">
             <div className="flex flex-col items-center">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                order.status === 'pending' || order.status === 'ready' || order.status === 'collected'
-                  ? 'bg-yellow-100 border-2 border-yellow-500'
-                  : 'bg-gray-100 border-2 border-gray-300'
-              }`}>
-                {order.status === 'pending' || order.status === 'ready' || order.status === 'collected' ? (
-                  <CheckCircle2 className="w-5 h-5 text-yellow-600" />
-                ) : (
-                  <Circle className="w-5 h-5 text-gray-400" />
-                )}
+              <div className="w-10 h-10 rounded-full flex items-center justify-center bg-yellow-100 border-2 border-yellow-500">
+                <CheckCircle2 className="w-5 h-5 text-yellow-600" />
               </div>
-              {order.status !== 'cancelled' && (
-                <div className={`w-0.5 h-16 ${
-                  order.status === 'ready' || order.status === 'collected'
-                    ? 'bg-blue-500'
-                    : 'bg-gray-300'
-                }`} />
-              )}
+              <div className={`w-0.5 h-16 ${
+                order.status === 'packed' || order.status === 'collected'
+                  ? 'bg-blue-500'
+                  : 'bg-gray-300'
+              }`} />
             </div>
             <div className="flex-1 pb-8">
-              <h3 className="text-sm font-semibold text-gray-900">Order Placed</h3>
+              <h3 className="text-sm font-semibold text-gray-900">Order Confirmed</h3>
               <p className="text-xs text-gray-500 mt-1">
-                Your order has been received and is being prepared
+                Your order has been confirmed and is being packed
               </p>
               <p className="text-xs text-gray-400 mt-1">
                 {new Date(order.createdAt).toLocaleString('en-US', {
@@ -132,104 +136,96 @@ export default function OrderDetailPage() {
             </div>
           </div>
 
-          {/* Ready */}
-          {order.status !== 'cancelled' && (
-            <div className="flex gap-4">
-              <div className="flex flex-col items-center">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                  order.status === 'ready' || order.status === 'collected'
-                    ? 'bg-blue-100 border-2 border-blue-500'
-                    : 'bg-gray-100 border-2 border-gray-300'
-                }`}>
-                  {order.status === 'ready' || order.status === 'collected' ? (
-                    <CheckCircle2 className="w-5 h-5 text-blue-600" />
-                  ) : (
-                    <Circle className="w-5 h-5 text-gray-400" />
-                  )}
-                </div>
-                {order.status !== 'ready' && (
-                  <div className={`w-0.5 h-16 ${
-                    order.status === 'collected'
-                      ? 'bg-green-500'
-                      : 'bg-gray-300'
-                  }`} />
+          {/* Packed */}
+          <div className="flex gap-4">
+            <div className="flex flex-col items-center">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                order.status === 'packed' || order.status === 'collected'
+                  ? 'bg-blue-100 border-2 border-blue-500'
+                  : 'bg-gray-100 border-2 border-gray-300'
+              }`}>
+                {order.status === 'packed' || order.status === 'collected' ? (
+                  <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                ) : (
+                  <Circle className="w-5 h-5 text-gray-400" />
                 )}
               </div>
-              <div className="flex-1 pb-8">
-                <h3 className="text-sm font-semibold text-gray-900">Ready for Collection</h3>
-                <p className="text-xs text-gray-500 mt-1">
-                  {order.status === 'ready' || order.status === 'collected'
-                    ? 'Your order is ready to be collected'
-                    : 'Waiting for collection point to prepare your order'}
-                </p>
-              </div>
+              {order.status !== 'packed' && (
+                <div className={`w-0.5 h-16 ${
+                  order.status === 'collected'
+                    ? 'bg-green-500'
+                    : 'bg-gray-300'
+                }`} />
+              )}
             </div>
-          )}
+            <div className="flex-1 pb-8">
+              <h3 className="text-sm font-semibold text-gray-900">Packed & Ready</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                {order.status === 'packed' || order.status === 'collected'
+                  ? 'Your order is packed and ready for collection'
+                  : 'Waiting for collection point to pack your order'}
+              </p>
+            </div>
+          </div>
 
           {/* Collected */}
-          {order.status !== 'cancelled' && (
-            <div className="flex gap-4">
-              <div className="flex flex-col items-center">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                  order.status === 'collected'
-                    ? 'bg-green-100 border-2 border-green-500'
-                    : 'bg-gray-100 border-2 border-gray-300'
-                }`}>
-                  {order.status === 'collected' ? (
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  ) : (
-                    <Circle className="w-5 h-5 text-gray-400" />
-                  )}
-                </div>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-gray-900">Collected</h3>
-                <p className="text-xs text-gray-500 mt-1">
-                  {order.status === 'collected'
-                    ? 'Your order has been collected. Thank you!'
-                    : 'Pending collection'}
-                </p>
+          <div className="flex gap-4">
+            <div className="flex flex-col items-center">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                order.status === 'collected'
+                  ? 'bg-green-100 border-2 border-green-500'
+                  : 'bg-gray-100 border-2 border-gray-300'
+              }`}>
+                {order.status === 'collected' ? (
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                ) : (
+                  <Circle className="w-5 h-5 text-gray-400" />
+                )}
               </div>
             </div>
-          )}
-
-          {/* Cancelled */}
-          {order.status === 'cancelled' && (
-            <div className="flex gap-4">
-              <div className="flex flex-col items-center">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-red-100 border-2 border-red-500">
-                  <CheckCircle2 className="w-5 h-5 text-red-600" />
-                </div>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-sm font-semibold text-gray-900">Order Cancelled</h3>
-                <p className="text-xs text-gray-500 mt-1">
-                  This order has been cancelled
-                </p>
-              </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-gray-900">Collected</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                {order.status === 'collected'
+                  ? 'Your order has been collected. Thank you!'
+                  : 'Pending collection'}
+              </p>
             </div>
-          )}
+          </div>
         </div>
       </div>
 
       {/* Order Items */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Items</h2>
-        <div className="space-y-3">
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <h2 className="text-base font-semibold text-gray-900 mb-3">Order Items</h2>
+        <div className="space-y-2">
           {order.items.map((item: any, index: number) => (
             <div
               key={index}
-              className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+              className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
             >
-              <div className="flex items-center gap-3">
-                <Package className="w-5 h-5 text-gray-400" />
+              <div className="flex items-center gap-2">
+                {/* Product Image */}
+                <div className="relative w-12 h-12 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                  {PRODUCT_IMAGES[item.itemId] ? (
+                    <img
+                      src={PRODUCT_IMAGES[item.itemId]}
+                      alt={item.itemName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Package className="w-5 h-5 text-gray-400" />
+                    </div>
+                  )}
+                </div>
                 <div>
                   <span className="text-sm font-medium text-gray-900">{item.itemName}</span>
-                  <p className="text-xs text-gray-500">Item ID: {item.itemId}</p>
+                  <p className="text-xs text-gray-500">{item.itemId}</p>
                 </div>
               </div>
               <div className="text-sm text-gray-600">
-                Quantity: <span className="font-semibold text-gray-900">{item.quantity}</span>
+                <span className="font-semibold text-gray-900">×{item.quantity}</span>
               </div>
             </div>
           ))}
@@ -241,10 +237,9 @@ export default function OrderDetailPage() {
 
 function getStatusColor(status: string) {
   const colors: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
-    ready: 'bg-blue-100 text-blue-800 border border-blue-200',
+    confirmed: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
+    packed: 'bg-blue-100 text-blue-800 border border-blue-200',
     collected: 'bg-green-100 text-green-800 border border-green-200',
-    cancelled: 'bg-red-100 text-red-800 border border-red-200',
   };
   return colors[status] || 'bg-gray-100 text-gray-800';
 }

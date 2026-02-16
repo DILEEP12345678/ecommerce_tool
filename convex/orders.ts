@@ -28,7 +28,7 @@ export const create = mutation({
       username: args.username,
       collectionPoint: args.collectionPoint,
       items: args.items,
-      status: "pending",
+      status: "confirmed",
       createdAt,
       statusUpdatedAt: createdAt,
       itemCount,
@@ -137,10 +137,9 @@ export const updateStatus = mutation({
   args: {
     orderId: v.string(),
     status: v.union(
-      v.literal("pending"),
-      v.literal("ready"),
-      v.literal("collected"),
-      v.literal("cancelled")
+      v.literal("confirmed"),
+      v.literal("packed"),
+      v.literal("collected")
     ),
   },
   handler: async (ctx, args) => {
@@ -187,10 +186,9 @@ export const getStats = query({
 export const getByStatus = query({
   args: {
     status: v.union(
-      v.literal("pending"),
-      v.literal("ready"),
-      v.literal("collected"),
-      v.literal("cancelled")
+      v.literal("confirmed"),
+      v.literal("packed"),
+      v.literal("collected")
     ),
   },
   handler: async (ctx, args) => {
@@ -216,10 +214,9 @@ export const getByCollectionPointAndStatus = query({
   args: {
     collectionPoint: v.string(),
     status: v.union(
-      v.literal("pending"),
-      v.literal("ready"),
-      v.literal("collected"),
-      v.literal("cancelled")
+      v.literal("confirmed"),
+      v.literal("packed"),
+      v.literal("collected")
     ),
     limit: v.optional(v.number()),
   },

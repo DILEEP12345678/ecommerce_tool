@@ -5,7 +5,7 @@ export default defineSchema({
   users: defineTable({
     email: v.string(),
     name: v.string(),
-    role: v.union(v.literal("customer"), v.literal("collection_point_manager")),
+    role: v.union(v.literal("customer"), v.literal("collection_point_manager"), v.literal("admin")),
     collectionPoint: v.optional(v.string()), // For collection point managers
     clerkId: v.string(),
   })
@@ -25,8 +25,8 @@ export default defineSchema({
       })
     ),
     status: v.union(
-      v.literal("pending"),
-      v.literal("ready"),
+      v.literal("confirmed"),
+      v.literal("packed"),
       v.literal("collected"),
       v.literal("cancelled")
     ),

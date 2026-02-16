@@ -1,10 +1,10 @@
 'use client';
 
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
-import { Loader2, Package, User, MapPin, ArrowLeft, Clock } from 'lucide-react';
+import { Loader2, Package, User, MapPin, ArrowLeft, Clock, CheckCircle2, Circle } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
-import { useCollectionPoint, useUser } from '../../../../components/UserContext';
+import { useUser } from '../../../../components/UserContext';
 import { useEffect } from 'react';
 
 // Product image mapping
@@ -21,23 +21,21 @@ const PRODUCT_IMAGES: Record<string, string> = {
   'PROD-010': 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&h=400&fit=crop',
 };
 
-export default function OrderDetailPage() {
+export default function AdminOrderDetailPage() {
   const router = useRouter();
   const params = useParams();
   const user = useUser();
-  const collectionPoint = useCollectionPoint();
   const orderId = params.orderId as string;
 
-  // Direct query for single order - much faster!
+  // Direct query for single order
   const order = useQuery(
     api.orders.getByOrderId,
     orderId ? { orderId } : 'skip'
   );
-  const updateStatus = useMutation(api.orders.updateStatus);
 
-  // Redirect to login if not logged in or not a manager
+  // Redirect to login if not logged in or not an admin
   useEffect(() => {
-    if (!user || user.role !== 'collection_point_manager') {
+    if (!user || user.role !== 'admin') {
       router.push('/login');
     }
   }, [user, router]);
@@ -45,7 +43,7 @@ export default function OrderDetailPage() {
   if (order === undefined) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
       </div>
     );
   }
@@ -58,22 +56,11 @@ export default function OrderDetailPage() {
     );
   }
 
-  const handleStatusChange = async (newStatus: string) => {
-    try {
-      await updateStatus({
-        orderId: order.orderId,
-        status: newStatus as any,
-      });
-    } catch (error) {
-      alert('Failed to update order status');
-    }
-  };
-
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
       {/* Back Button */}
       <button
-        onClick={() => router.push('/collection-point')}
+        onClick={() => router.push('/admin')}
         className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" />
@@ -120,8 +107,100 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
+      {/* Status Timeline */}
+      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-6">Order Status Timeline</h2>
+
+        <div className="space-y-6">
+          {/* Confirmed */}
+          <div className="flex gap-4">
+            <div className="flex flex-col items-center">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center bg-yellow-100 border-2 border-yellow-500">
+                <CheckCircle2 className="w-5 h-5 text-yellow-600" />
+              </div>
+              <div className={`w-0.5 h-16 ${
+                order.status === 'packed' || order.status === 'collected'
+                  ? 'bg-blue-500'
+                  : 'bg-gray-300'
+              }`} />
+            </div>
+            <div className="flex-1 pb-8">
+              <h3 className="text-sm font-semibold text-gray-900">Order Confirmed</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Order has been confirmed and is being packed
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                {new Date(order.createdAt).toLocaleString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </p>
+            </div>
+          </div>
+
+          {/* Packed */}
+          <div className="flex gap-4">
+            <div className="flex flex-col items-center">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                order.status === 'packed' || order.status === 'collected'
+                  ? 'bg-blue-100 border-2 border-blue-500'
+                  : 'bg-gray-100 border-2 border-gray-300'
+              }`}>
+                {order.status === 'packed' || order.status === 'collected' ? (
+                  <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                ) : (
+                  <Circle className="w-5 h-5 text-gray-400" />
+                )}
+              </div>
+              {order.status !== 'packed' && (
+                <div className={`w-0.5 h-16 ${
+                  order.status === 'collected'
+                    ? 'bg-green-500'
+                    : 'bg-gray-300'
+                }`} />
+              )}
+            </div>
+            <div className="flex-1 pb-8">
+              <h3 className="text-sm font-semibold text-gray-900">Packed & Ready</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                {order.status === 'packed' || order.status === 'collected'
+                  ? 'Order is packed and ready for collection'
+                  : 'Waiting for collection point to pack the order'}
+              </p>
+            </div>
+          </div>
+
+          {/* Collected */}
+          <div className="flex gap-4">
+            <div className="flex flex-col items-center">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                order.status === 'collected'
+                  ? 'bg-green-100 border-2 border-green-500'
+                  : 'bg-gray-100 border-2 border-gray-300'
+              }`}>
+                {order.status === 'collected' ? (
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                ) : (
+                  <Circle className="w-5 h-5 text-gray-400" />
+                )}
+              </div>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-gray-900">Collected</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                {order.status === 'collected'
+                  ? 'Order has been collected by customer'
+                  : 'Pending collection'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Order Items */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+      <div className="bg-white rounded-lg border border-gray-200 p-4">
         <h2 className="text-base font-semibold text-gray-900 mb-3">Order Items</h2>
         <div className="space-y-2">
           {order.items.map((item: any, index: number) => (
@@ -144,7 +223,10 @@ export default function OrderDetailPage() {
                     </div>
                   )}
                 </div>
-                <span className="text-sm font-medium text-gray-900">{item.itemName}</span>
+                <div>
+                  <span className="text-sm font-medium text-gray-900">{item.itemName}</span>
+                  <p className="text-xs text-gray-500">{item.itemId}</p>
+                </div>
               </div>
               <div className="text-sm text-gray-600">
                 <span className="font-semibold text-gray-900">×{item.quantity}</span>
@@ -152,43 +234,6 @@ export default function OrderDetailPage() {
             </div>
           ))}
         </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Actions</h2>
-
-        {order.status === 'confirmed' && (
-          <button
-            onClick={() => handleStatusChange('packed')}
-            className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-semibold transition-colors"
-          >
-            Mark as Packed
-          </button>
-        )}
-
-        {order.status === 'packed' && (
-          <div className="flex gap-3">
-            <button
-              onClick={() => handleStatusChange('collected')}
-              className="flex-1 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-semibold transition-colors"
-            >
-              Mark as Collected
-            </button>
-            <button
-              onClick={() => handleStatusChange('confirmed')}
-              className="px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-sm font-semibold transition-colors"
-            >
-              Move Back to Confirmed
-            </button>
-          </div>
-        )}
-
-        {order.status === 'collected' && (
-          <div className="text-center py-4 bg-green-50 text-green-700 rounded-lg border border-green-200">
-            <p className="text-sm font-semibold">✓ This order has been collected</p>
-          </div>
-        )}
       </div>
     </div>
   );

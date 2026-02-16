@@ -1,22 +1,39 @@
 'use client';
 
-import { useQuery } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { Loader2, Package, User, MapPin, ShoppingCart, Hash } from 'lucide-react';
+import { Loader2, Package, User, MapPin, ShoppingCart, Hash, CheckCircle } from 'lucide-react';
 import { useCollectionPoint, useUser } from '../../components/UserContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, memo } from 'react';
+
+// Product image mapping
+const PRODUCT_IMAGES: Record<string, string> = {
+  'PROD-001': 'https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=400&h=400&fit=crop',
+  'PROD-002': 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=400&h=400&fit=crop',
+  'PROD-003': 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&h=400&fit=crop',
+  'PROD-004': 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=400&fit=crop',
+  'PROD-005': 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=400&h=400&fit=crop',
+  'PROD-006': 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400&h=400&fit=crop',
+  'PROD-007': 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=400&h=400&fit=crop',
+  'PROD-008': 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=400&h=400&fit=crop',
+  'PROD-009': 'https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=400&h=400&fit=crop',
+  'PROD-010': 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&h=400&fit=crop',
+};
 
 export default function CollectionPointPage() {
   const router = useRouter();
   const user = useUser();
   const collectionPoint = useCollectionPoint();
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedStatus, setSelectedStatus] = useState<string>('confirmed');
+  const [checkedOrders, setCheckedOrders] = useState<Set<string>>(new Set());
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const orders = useQuery(
     api.orders.getByCollectionPoint,
     collectionPoint ? { collectionPoint } : 'skip'
   );
+  const updateStatus = useMutation(api.orders.updateStatus);
 
   // Redirect to login if not logged in or not a manager
   useEffect(() => {
@@ -24,6 +41,59 @@ export default function CollectionPointPage() {
       router.push('/login');
     }
   }, [user, router]);
+
+  // Clear checked orders when status filter changes
+  useEffect(() => {
+    setCheckedOrders(new Set());
+  }, [selectedStatus]);
+
+  // Handle packing completion
+  const handlePackingCompleted = async () => {
+    if (checkedOrders.size === 0 || isProcessing) return;
+
+    setIsProcessing(true);
+    try {
+      // Update status for all checked orders to "packed"
+      await Promise.all(
+        Array.from(checkedOrders).map(orderId =>
+          updateStatus({ orderId, status: 'packed' })
+        )
+      );
+
+      // Clear checked orders after successful update
+      setCheckedOrders(new Set());
+      alert(`Successfully marked ${checkedOrders.size} order(s) as packed!`);
+    } catch (error) {
+      alert('Failed to update orders. Please try again.');
+      console.error(error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle collection completion
+  const handleCollectionCompleted = async () => {
+    if (checkedOrders.size === 0 || isProcessing) return;
+
+    setIsProcessing(true);
+    try {
+      // Update status for all checked orders to "collected"
+      await Promise.all(
+        Array.from(checkedOrders).map(orderId =>
+          updateStatus({ orderId, status: 'collected' })
+        )
+      );
+
+      // Clear checked orders after successful update
+      setCheckedOrders(new Set());
+      alert(`Successfully marked ${checkedOrders.size} order(s) as collected!`);
+    } catch (error) {
+      alert('Failed to update orders. Please try again.');
+      console.error(error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   if (!orders) {
     return (
@@ -33,28 +103,28 @@ export default function CollectionPointPage() {
     );
   }
 
-  const filteredOrders =
-    selectedStatus === 'all'
-      ? orders
-      : orders.filter((order: any) => order.status === selectedStatus);
+  // Filter out cancelled orders from all views
+  const activeOrders = orders.filter((order: any) => order.status !== 'cancelled');
 
-  // Calculate product and quantity stats
+  const filteredOrders = activeOrders.filter((order: any) => order.status === selectedStatus);
+
+  // Calculate product and quantity stats (exclude cancelled orders)
   const uniqueProducts = new Set<string>();
-  const pendingItems = new Map<string, { itemId: string; itemName: string; quantity: number }>();
+  const confirmedItems = new Map<string, { itemId: string; itemName: string; quantity: number }>();
 
-  orders.forEach((order: any) => {
+  activeOrders.forEach((order: any) => {
     order.items.forEach((item: any) => {
       uniqueProducts.add(item.itemId);
     });
 
-    // Aggregate pending order items
-    if (order.status === 'pending') {
+    // Aggregate confirmed order items
+    if (order.status === 'confirmed') {
       order.items.forEach((item: any) => {
-        const existing = pendingItems.get(item.itemId);
+        const existing = confirmedItems.get(item.itemId);
         if (existing) {
           existing.quantity += item.quantity;
         } else {
-          pendingItems.set(item.itemId, {
+          confirmedItems.set(item.itemId, {
             itemId: item.itemId,
             itemName: item.itemName,
             quantity: item.quantity,
@@ -65,15 +135,14 @@ export default function CollectionPointPage() {
   });
 
   const stats = {
-    total: orders.length,
-    pending: orders.filter((o: any) => o.status === 'pending').length,
-    ready: orders.filter((o: any) => o.status === 'ready').length,
-    collected: orders.filter((o: any) => o.status === 'collected').length,
-    cancelled: orders.filter((o: any) => o.status === 'cancelled').length,
+    total: activeOrders.length,
+    confirmed: activeOrders.filter((o: any) => o.status === 'confirmed').length,
+    packed: activeOrders.filter((o: any) => o.status === 'packed').length,
+    collected: activeOrders.filter((o: any) => o.status === 'collected').length,
   };
 
-  // Convert pending items map to sorted array
-  const pendingItemsList = Array.from(pendingItems.values()).sort((a, b) =>
+  // Convert confirmed items map to sorted array
+  const confirmedItemsList = Array.from(confirmedItems.values()).sort((a, b) =>
     a.itemName.localeCompare(b.itemName)
   );
 
@@ -85,13 +154,13 @@ export default function CollectionPointPage() {
         <h1 className="text-xl font-bold text-gray-900">{collectionPoint}</h1>
       </div>
 
-      {/* Pending Items to Prepare */}
-      {pendingItemsList.length > 0 && (
+      {/* Confirmed Items to Pack */}
+      {confirmedItemsList.length > 0 && (
         <div className="mb-4 bg-white rounded-lg border border-gray-200 p-4">
           <div className="flex items-center gap-2 mb-3">
             <ShoppingCart className="w-5 h-5 text-gray-700" />
             <h2 className="text-sm font-bold text-gray-900">
-              Items to Prepare ({pendingItemsList.length} products)
+              Items to Pack ({confirmedItemsList.length} products)
             </h2>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -110,7 +179,7 @@ export default function CollectionPointPage() {
                 </tr>
               </thead>
               <tbody>
-                {pendingItemsList.map((item) => (
+                {confirmedItemsList.map((item) => (
                   <tr key={item.itemId} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
                     <td className="px-4 py-2 text-xs text-gray-600">{item.itemId}</td>
                     <td className="px-4 py-2 text-sm font-medium text-gray-900">{item.itemName}</td>
@@ -137,49 +206,34 @@ export default function CollectionPointPage() {
         </div>
 
         {/* Stats Grid - Clickable Filters */}
-        <div className="mb-4 grid grid-cols-2 md:grid-cols-5 gap-2">
+        <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-2">
           <button
-            onClick={() => setSelectedStatus('all')}
+            onClick={() => setSelectedStatus('confirmed')}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-              selectedStatus === 'all'
-                ? 'bg-gray-800 border-gray-900 shadow-md'
-                : 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-sm'
-            }`}
-          >
-            <Hash className={`w-4 h-4 ${selectedStatus === 'all' ? 'text-white' : 'text-gray-500'}`} />
-            <div>
-              <p className={`text-xs ${selectedStatus === 'all' ? 'text-gray-300' : 'text-gray-500'}`}>Total</p>
-              <p className={`text-lg font-bold ${selectedStatus === 'all' ? 'text-white' : 'text-gray-900'}`}>{stats.total}</p>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setSelectedStatus('pending')}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-              selectedStatus === 'pending'
+              selectedStatus === 'confirmed'
                 ? 'bg-yellow-600 border-yellow-700 shadow-md'
                 : 'bg-yellow-50 border-yellow-200 hover:border-yellow-300 hover:shadow-sm'
             }`}
           >
-            <Package className={`w-4 h-4 ${selectedStatus === 'pending' ? 'text-yellow-100' : 'text-yellow-700'}`} />
+            <Package className={`w-4 h-4 ${selectedStatus === 'confirmed' ? 'text-yellow-100' : 'text-yellow-700'}`} />
             <div>
-              <p className={`text-xs ${selectedStatus === 'pending' ? 'text-yellow-100' : 'text-yellow-700'}`}>Pending</p>
-              <p className={`text-lg font-bold ${selectedStatus === 'pending' ? 'text-white' : 'text-yellow-800'}`}>{stats.pending}</p>
+              <p className={`text-xs ${selectedStatus === 'confirmed' ? 'text-yellow-100' : 'text-yellow-700'}`}>Confirmed</p>
+              <p className={`text-lg font-bold ${selectedStatus === 'confirmed' ? 'text-white' : 'text-yellow-800'}`}>{stats.confirmed}</p>
             </div>
           </button>
 
           <button
-            onClick={() => setSelectedStatus('ready')}
+            onClick={() => setSelectedStatus('packed')}
             className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-              selectedStatus === 'ready'
+              selectedStatus === 'packed'
                 ? 'bg-blue-600 border-blue-700 shadow-md'
                 : 'bg-blue-50 border-blue-200 hover:border-blue-300 hover:shadow-sm'
             }`}
           >
-            <Package className={`w-4 h-4 ${selectedStatus === 'ready' ? 'text-blue-100' : 'text-blue-700'}`} />
+            <Package className={`w-4 h-4 ${selectedStatus === 'packed' ? 'text-blue-100' : 'text-blue-700'}`} />
             <div>
-              <p className={`text-xs ${selectedStatus === 'ready' ? 'text-blue-100' : 'text-blue-700'}`}>Ready</p>
-              <p className={`text-lg font-bold ${selectedStatus === 'ready' ? 'text-white' : 'text-blue-800'}`}>{stats.ready}</p>
+              <p className={`text-xs ${selectedStatus === 'packed' ? 'text-blue-100' : 'text-blue-700'}`}>Packed</p>
+              <p className={`text-lg font-bold ${selectedStatus === 'packed' ? 'text-white' : 'text-blue-800'}`}>{stats.packed}</p>
             </div>
           </button>
 
@@ -197,21 +251,6 @@ export default function CollectionPointPage() {
               <p className={`text-lg font-bold ${selectedStatus === 'collected' ? 'text-white' : 'text-green-800'}`}>{stats.collected}</p>
             </div>
           </button>
-
-          <button
-            onClick={() => setSelectedStatus('cancelled')}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-              selectedStatus === 'cancelled'
-                ? 'bg-red-600 border-red-700 shadow-md'
-                : 'bg-red-50 border-red-200 hover:border-red-300 hover:shadow-sm'
-            }`}
-          >
-            <Package className={`w-4 h-4 ${selectedStatus === 'cancelled' ? 'text-red-100' : 'text-red-700'}`} />
-            <div>
-              <p className={`text-xs ${selectedStatus === 'cancelled' ? 'text-red-100' : 'text-red-700'}`}>Cancelled</p>
-              <p className={`text-lg font-bold ${selectedStatus === 'cancelled' ? 'text-white' : 'text-red-800'}`}>{stats.cancelled}</p>
-            </div>
-          </button>
         </div>
 
         {/* Compact Orders Grid - 4 per row */}
@@ -223,26 +262,148 @@ export default function CollectionPointPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
             {filteredOrders.map((order: any) => (
-              <OrderCard key={order.orderId} order={order} router={router} />
+              <OrderCard
+                key={order.orderId}
+                order={order}
+                router={router}
+                isChecked={checkedOrders.has(order.orderId)}
+                onToggleCheck={(orderId: string) => {
+                  setCheckedOrders(prev => {
+                    const newSet = new Set(prev);
+                    if (newSet.has(orderId)) {
+                      newSet.delete(orderId);
+                    } else {
+                      newSet.add(orderId);
+                    }
+                    return newSet;
+                  });
+                }}
+              />
             ))}
           </div>
         )}
       </div>
+
+      {/* Action Buttons - Fixed at bottom center - Hide for collected orders view */}
+      {(() => {
+        // Don't show any buttons when viewing collected orders
+        if (selectedStatus === 'collected') {
+          return null;
+        }
+
+        // Get the actual order IDs from filtered orders for each status
+        const packedOrderIds = filteredOrders
+          .filter((order: any) => order.status === 'packed')
+          .map((order: any) => order.orderId);
+
+        const confirmedOrderIds = filteredOrders
+          .filter((order: any) => order.status === 'confirmed')
+          .map((order: any) => order.orderId);
+
+        // Check if any checked orders are actually packed orders
+        const hasCheckedPackedOrders = Array.from(checkedOrders).some(orderId =>
+          packedOrderIds.includes(orderId)
+        );
+
+        const hasCheckedOrders = checkedOrders.size > 0;
+        const allOrdersChecked = filteredOrders.length > 0 && checkedOrders.size === filteredOrders.length;
+
+        // Show "Collected" button ONLY if there are checked orders that are actually packed
+        if (hasCheckedPackedOrders && hasCheckedOrders) {
+          return (
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg p-4 z-40">
+              <div className="max-w-7xl mx-auto flex justify-center">
+                <button
+                  onClick={handleCollectionCompleted}
+                  disabled={isProcessing}
+                  className={`flex items-center gap-2 px-8 py-3 rounded-lg font-semibold text-white transition-all ${
+                    isProcessing
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-green-500 hover:bg-green-600 shadow-md hover:shadow-lg'
+                  }`}
+                >
+                  <CheckCircle className="w-5 h-5" />
+                  {isProcessing
+                    ? 'Processing...'
+                    : `Mark as Collected (${checkedOrders.size} order${checkedOrders.size > 1 ? 's' : ''})`}
+                </button>
+              </div>
+            </div>
+          );
+        }
+
+        // Show "Packing Completed" button if all confirmed orders are checked (no packed orders checked)
+        if (!hasCheckedPackedOrders && allOrdersChecked) {
+          return (
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg p-4 z-40">
+              <div className="max-w-7xl mx-auto flex justify-center">
+                <button
+                  onClick={handlePackingCompleted}
+                  disabled={isProcessing}
+                  className={`flex items-center gap-2 px-8 py-3 rounded-lg font-semibold text-white transition-all ${
+                    isProcessing
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-blue-500 hover:bg-blue-600 shadow-md hover:shadow-lg'
+                  }`}
+                >
+                  <CheckCircle className="w-5 h-5" />
+                  {isProcessing
+                    ? 'Processing...'
+                    : `Packing Completed (${checkedOrders.size} order${checkedOrders.size > 1 ? 's' : ''})`}
+                </button>
+              </div>
+            </div>
+          );
+        }
+
+        return null;
+      })()}
     </div>
   );
 }
 
 // Memoized OrderCard component for better performance
-const OrderCard = memo(({ order, router }: { order: any; router: any }) => {
+const OrderCard = memo(({ order, router, isChecked, onToggleCheck }: {
+  order: any;
+  router: any;
+  isChecked: boolean;
+  onToggleCheck: (orderId: string) => void;
+}) => {
+  const isCollected = order.status === 'collected';
+
   return (
     <div
-      onClick={() => router.push(`/collection-point/orders/${order.orderId}`)}
-      className="bg-gray-50 rounded-lg border border-gray-200 p-3 hover:shadow-md hover:border-blue-300 transition-all flex flex-col cursor-pointer"
+      className={`bg-gray-50 rounded-lg border border-gray-200 p-3 hover:shadow-md hover:border-blue-300 transition-all flex flex-col relative ${
+        isChecked ? 'opacity-40' : ''
+      }`}
     >
+      {/* Checkbox - Hide for collected orders */}
+      {!isCollected && (
+        <div
+          className="absolute top-2 left-2 z-10"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleCheck(order.orderId);
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={isChecked}
+            onChange={() => {}}
+            className="w-5 h-5 cursor-pointer accent-blue-500"
+          />
+        </div>
+      )}
+
+      {/* Order Card Content */}
+      <div
+        onClick={() => router.push(`/collection-point/orders/${order.orderId}`)}
+        className="cursor-pointer"
+      >
                 {/* Compact Order Header */}
                 <div className="mb-2">
                   <div className="flex items-center justify-between mb-1">
-                    <p className="text-xs font-semibold text-gray-900">
+                    <p className={`text-xs font-semibold text-gray-900 ${!isCollected ? 'ml-6' : ''}`}>
                       #{order.orderId.split('-')[1]}
                     </p>
                     <span
@@ -271,13 +432,26 @@ const OrderCard = memo(({ order, router }: { order: any; router: any }) => {
                 <div className="mb-2 bg-white rounded px-3 py-2">
                   <div className="flex items-center justify-between py-1">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <Package className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                      {/* Product Image */}
+                      <div className="relative w-8 h-8 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                        {PRODUCT_IMAGES[order.items[0].itemId] ? (
+                          <img
+                            src={PRODUCT_IMAGES[order.items[0].itemId]}
+                            alt={order.items[0].itemName}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Package className="w-4 h-4 text-gray-400" />
+                          </div>
+                        )}
+                      </div>
                       <span className="text-xs font-medium text-gray-900 truncate">
                         {order.items[0].itemName}
                       </span>
                     </div>
                     <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
-                      Qty: <span className="font-semibold text-gray-900">{order.items[0].quantity}</span>
+                      <span className="font-semibold text-gray-900">×{order.items[0].quantity}</span>
                     </span>
                   </div>
                   {order.items.length > 1 && (
@@ -295,6 +469,7 @@ const OrderCard = memo(({ order, router }: { order: any; router: any }) => {
                     Click to view details and manage order
                   </p>
                 </div>
+      </div>
     </div>
   );
 });
@@ -303,10 +478,9 @@ OrderCard.displayName = 'OrderCard';
 
 function getStatusColor(status: string) {
   const colors: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-800',
-    ready: 'bg-blue-100 text-blue-800',
+    confirmed: 'bg-yellow-100 text-yellow-800',
+    packed: 'bg-blue-100 text-blue-800',
     collected: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800',
   };
   return colors[status] || 'bg-gray-100 text-gray-800';
 }

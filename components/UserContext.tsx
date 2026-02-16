@@ -5,7 +5,7 @@ import { createContext, useContext, useState, ReactNode, useEffect } from 'react
 interface User {
   email: string;
   name: string;
-  role: 'customer' | 'collection_point_manager';
+  role: 'customer' | 'collection_point_manager' | 'admin';
   collectionPoint?: string;
 }
 

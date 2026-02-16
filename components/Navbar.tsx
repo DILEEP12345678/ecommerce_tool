@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, ClipboardList, LogIn, LogOut, Package } from 'lucide-react';
+import { Home, ClipboardList, LogIn, LogOut, Package, Shield } from 'lucide-react';
 import { useUser, useSetUser, useUserRole } from './UserContext';
 
 export default function Navbar() {
@@ -26,8 +26,19 @@ export default function Navbar() {
     { href: '/collection-point', label: 'Dashboard', icon: Package },
   ];
 
-  const links = role === 'collection_point_manager' ? managerLinks : customerLinks;
-  const homeLink = role === 'collection_point_manager' ? '/collection-point' : '/store';
+  const adminLinks = [
+    { href: '/admin', label: 'Admin Dashboard', icon: Shield },
+  ];
+
+  const links =
+    role === 'admin' ? adminLinks :
+    role === 'collection_point_manager' ? managerLinks :
+    customerLinks;
+
+  const homeLink =
+    role === 'admin' ? '/admin' :
+    role === 'collection_point_manager' ? '/collection-point' :
+    '/store';
 
   return (
     <nav className="bg-white shadow-sm sticky top-0 z-50">
@@ -70,7 +81,7 @@ export default function Navbar() {
                 <div className="text-right hidden sm:block">
                   <p className="text-sm font-medium text-gray-900">{user.name}</p>
                   <p className="text-xs text-gray-500">
-                    {role === 'collection_point_manager' ? 'Manager' : 'Customer'}
+                    {role === 'admin' ? 'Admin' : role === 'collection_point_manager' ? 'Manager' : 'Customer'}
                   </p>
                 </div>
                 <button

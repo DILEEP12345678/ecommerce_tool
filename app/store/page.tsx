@@ -151,45 +151,63 @@ export default function HomePage() {
           return (
             <div
               key={product.id}
-              className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-6 border border-gray-200"
+              className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden border border-gray-200"
             >
-              <div className="flex items-center justify-center mb-4">
-                <Package className="w-12 h-12 text-blue-500" />
+              {/* Product Image */}
+              <div className="relative w-full h-32 bg-gray-100">
+                <img
+                  src={product.image}
+                  alt={product.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    // Fallback to icon if image fails to load
+                    e.currentTarget.style.display = 'none';
+                    const fallback = e.currentTarget.nextElementSibling;
+                    if (fallback) fallback.classList.remove('hidden');
+                  }}
+                />
+                <div className="hidden absolute inset-0 flex items-center justify-center bg-gray-100">
+                  <Package className="w-8 h-8 text-blue-500" />
+                </div>
               </div>
-              <h3 className="text-base font-semibold text-gray-900 mb-2 text-center">
-                {product.name}
-              </h3>
-              <p className="text-xs text-gray-500 mb-4 text-center">
-                {product.category}
-              </p>
 
-              {quantity === 0 ? (
-                <button
-                  onClick={() => updateQuantity(product, 1)}
-                  className="w-full py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm flex items-center justify-center gap-2 font-medium"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add to Order
-                </button>
-              ) : (
-                <div className="flex items-center gap-2">
+              {/* Product Info */}
+              <div className="p-4">
+                <h3 className="text-sm font-semibold text-gray-900 mb-1 text-center truncate">
+                  {product.name}
+                </h3>
+                <p className="text-xs text-gray-500 mb-3 text-center">
+                  {product.category}
+                </p>
+
+                {quantity === 0 ? (
                   <button
-                    onClick={() => updateQuantity(product, quantity - 1)}
-                    className="flex-1 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg flex items-center justify-center"
-                  >
-                    <Minus className="w-4 h-4" />
-                  </button>
-                  <div className="flex-1 py-2 bg-blue-50 text-blue-700 rounded-lg text-center font-bold">
-                    {quantity}
-                  </div>
-                  <button
-                    onClick={() => updateQuantity(product, quantity + 1)}
-                    className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center justify-center"
+                    onClick={() => updateQuantity(product, 1)}
+                    className="w-full py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm flex items-center justify-center gap-2 font-medium transition-colors"
                   >
                     <Plus className="w-4 h-4" />
+                    Add to Order
                   </button>
-                </div>
-              )}
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => updateQuantity(product, quantity - 1)}
+                      className="flex-1 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg flex items-center justify-center transition-colors"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <div className="flex-1 py-2 bg-blue-50 text-blue-700 rounded-lg text-center font-bold">
+                      {quantity}
+                    </div>
+                    <button
+                      onClick={() => updateQuantity(product, quantity + 1)}
+                      className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center justify-center transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}

@@ -7,6 +7,20 @@ import { useUsername } from '../../../components/UserContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, memo } from 'react';
 
+// Product image mapping
+const PRODUCT_IMAGES: Record<string, string> = {
+  'PROD-001': 'https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=400&h=400&fit=crop',
+  'PROD-002': 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=400&h=400&fit=crop',
+  'PROD-003': 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&h=400&fit=crop',
+  'PROD-004': 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&h=400&fit=crop',
+  'PROD-005': 'https://images.unsplash.com/photo-1582722872445-44dc5f7e3c8f?w=400&h=400&fit=crop',
+  'PROD-006': 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400&h=400&fit=crop',
+  'PROD-007': 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=400&h=400&fit=crop',
+  'PROD-008': 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=400&h=400&fit=crop',
+  'PROD-009': 'https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=400&h=400&fit=crop',
+  'PROD-010': 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=400&h=400&fit=crop',
+};
+
 export default function OrdersPage() {
   const router = useRouter();
   const username = useUsername();
@@ -102,13 +116,26 @@ const OrderCard = memo(({ order, router }: { order: any; router: any }) => {
               <div className="bg-white p-3 rounded-lg border border-gray-200 mb-2">
                 <div className="flex items-center justify-between py-1">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <Package className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                    {/* Product Image */}
+                    <div className="relative w-8 h-8 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                      {PRODUCT_IMAGES[order.items[0].itemId] ? (
+                        <img
+                          src={PRODUCT_IMAGES[order.items[0].itemId]}
+                          alt={order.items[0].itemName}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Package className="w-4 h-4 text-gray-400" />
+                        </div>
+                      )}
+                    </div>
                     <span className="text-xs font-medium text-gray-900 truncate">
                       {order.items[0].itemName}
                     </span>
                   </div>
                   <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
-                    Qty: <span className="font-semibold text-gray-900">{order.items[0].quantity}</span>
+                    <span className="font-semibold text-gray-900">×{order.items[0].quantity}</span>
                   </span>
                 </div>
                 {order.items.length > 1 && (
@@ -134,10 +161,9 @@ OrderCard.displayName = 'OrderCard';
 
 function getStatusColor(status: string) {
   const colors: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-800',
-    ready: 'bg-blue-100 text-blue-800',
+    confirmed: 'bg-yellow-100 text-yellow-800',
+    packed: 'bg-blue-100 text-blue-800',
     collected: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800',
   };
   return colors[status] || 'bg-gray-100 text-gray-800';
 }
