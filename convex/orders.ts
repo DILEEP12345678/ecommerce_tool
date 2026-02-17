@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { paginationOptsValidator } from "convex/server";
 
 // Create order with items array (single row per order)
 export const create = mutation({
@@ -273,5 +274,193 @@ export const getRecentByCollectionPoint = query({
       totalQuantity: order.totalQuantity,
       items: order.items,
     }));
+  },
+});
+
+// ─── P0 FIX: Paginated query with smart index routing ────────────────────────
+// Handles all filter combinations (status, collectionPoint, or both) and routes
+// to the most efficient composite index. Replaces listAll / getByCollectionPoint.
+export const listAllPaginated = query({
+  args: {
+    paginationOpts: paginationOptsValidator,
+    status: v.optional(
+      v.union(
+        v.literal("confirmed"),
+        v.literal("packed"),
+        v.literal("collected"),
+        v.literal("cancelled")
+      )
+    ),
+    collectionPoint: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const orderShape = (order: any) => ({
+      orderId: order.orderId,
+      username: order.username,
+      collectionPoint: order.collectionPoint,
+      status: order.status,
+      createdAt: order.createdAt,
+      statusUpdatedAt: order.statusUpdatedAt,
+      itemCount: order.itemCount,
+      totalQuantity: order.totalQuantity,
+      items: order.items,
+    });
+
+    // Both filters → composite index (most selective)
+    if (args.collectionPoint && args.status) {
+      const result = await ctx.db
+        .query("orders")
+        .withIndex("by_collection_point_status", (q) =>
+          q
+            .eq("collectionPoint", args.collectionPoint!)
+            .eq("status", args.status!)
+        )
+        .order("desc")
+        .paginate(args.paginationOpts);
+      return { ...result, page: result.page.map(orderShape) };
+    }
+
+    // Status only → status index
+    if (args.status) {
+      const result = await ctx.db
+        .query("orders")
+        .withIndex("by_status", (q) => q.eq("status", args.status!))
+        .order("desc")
+        .paginate(args.paginationOpts);
+      return { ...result, page: result.page.map(orderShape) };
+    }
+
+    // Collection point only → collection point index
+    if (args.collectionPoint) {
+      const result = await ctx.db
+        .query("orders")
+        .withIndex("by_collection_point", (q) =>
+          q.eq("collectionPoint", args.collectionPoint!)
+        )
+        .order("desc")
+        .paginate(args.paginationOpts);
+      return { ...result, page: result.page.map(orderShape) };
+    }
+
+    // No filters → full table scan, paginated (admin all-orders view)
+    const result = await ctx.db
+      .query("orders")
+      .order("desc")
+      .paginate(args.paginationOpts);
+    return { ...result, page: result.page.map(orderShape) };
+  },
+});
+
+// ─── P0 FIX: Paginated customer order history ────────────────────────────────
+export const getByUsernamePaginated = query({
+  args: {
+    username: v.string(),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const result = await ctx.db
+      .query("orders")
+      .withIndex("by_username", (q) => q.eq("username", args.username))
+      .order("desc")
+      .paginate(args.paginationOpts);
+
+    return {
+      ...result,
+      page: result.page.map((order) => ({
+        orderId: order.orderId,
+        username: order.username,
+        collectionPoint: order.collectionPoint,
+        status: order.status,
+        createdAt: order.createdAt,
+        items: order.items,
+      })),
+    };
+  },
+});
+
+// ─── P0 FIX: Server-side status counts using indexes ─────────────────────────
+export const getStatusCounts = query({
+  args: {
+    collectionPoint: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const countIndex = async (
+      status: "confirmed" | "packed" | "collected"
+    ): Promise<number> => {
+      if (args.collectionPoint) {
+        const rows = await ctx.db
+          .query("orders")
+          .withIndex("by_collection_point_status", (q) =>
+            q
+              .eq("collectionPoint", args.collectionPoint!)
+              .eq("status", status)
+          )
+          .collect();
+        return rows.length;
+      }
+      const rows = await ctx.db
+        .query("orders")
+        .withIndex("by_status", (q) => q.eq("status", status))
+        .collect();
+      return rows.length;
+    };
+
+    const [confirmed, packed, collected] = await Promise.all([
+      countIndex("confirmed"),
+      countIndex("packed"),
+      countIndex("collected"),
+    ]);
+
+    return { confirmed, packed, collected, total: confirmed + packed + collected };
+  },
+});
+
+// ─── P0 FIX: Server-side items-to-pack aggregation ───────────────────────────
+export const getConfirmedItemsSummary = query({
+  args: {
+    collectionPoint: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const confirmedOrders = args.collectionPoint
+      ? await ctx.db
+          .query("orders")
+          .withIndex("by_collection_point_status", (q) =>
+            q
+              .eq("collectionPoint", args.collectionPoint!)
+              .eq("status", "confirmed")
+          )
+          .collect()
+      : await ctx.db
+          .query("orders")
+          .withIndex("by_status", (q) => q.eq("status", "confirmed"))
+          .collect();
+
+    const itemMap = new Map<
+      string,
+      { itemId: string; itemName: string; quantity: number; collectionPoints: string[] }
+    >();
+
+    for (const order of confirmedOrders) {
+      for (const item of order.items) {
+        const existing = itemMap.get(item.itemId);
+        if (existing) {
+          existing.quantity += item.quantity;
+          if (!existing.collectionPoints.includes(order.collectionPoint)) {
+            existing.collectionPoints.push(order.collectionPoint);
+          }
+        } else {
+          itemMap.set(item.itemId, {
+            itemId: item.itemId,
+            itemName: item.itemName,
+            quantity: item.quantity,
+            collectionPoints: [order.collectionPoint],
+          });
+        }
+      }
+    }
+
+    return Array.from(itemMap.values()).sort((a, b) =>
+      a.itemName.localeCompare(b.itemName)
+    );
   },
 });

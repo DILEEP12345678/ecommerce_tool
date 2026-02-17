@@ -1,11 +1,13 @@
 'use client';
 
-import { useQuery } from 'convex/react';
+import { usePaginatedQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { ClipboardList, Loader2, Package } from 'lucide-react';
+import { ClipboardList, Loader2, Package, ChevronDown } from 'lucide-react';
 import { useUsername } from '../../../components/UserContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, memo } from 'react';
+
+const PAGE_SIZE = 20;
 
 // Product image mapping
 const PRODUCT_IMAGES: Record<string, string> = {
@@ -24,9 +26,11 @@ const PRODUCT_IMAGES: Record<string, string> = {
 export default function OrdersPage() {
   const router = useRouter();
   const username = useUsername();
-  const orders = useQuery(
-    api.orders.getByUsername,
-    username ? { username } : 'skip'
+  // ── P0 FIX: paginated customer order history
+  const { results: orders, status: loadStatus, loadMore } = usePaginatedQuery(
+    api.orders.getByUsernamePaginated,
+    username ? { username } : 'skip',
+    { initialNumItems: PAGE_SIZE }
   );
 
   // Redirect to login if not logged in
@@ -36,7 +40,7 @@ export default function OrdersPage() {
     }
   }, [username, router]);
 
-  if (!orders) {
+  if (loadStatus === 'LoadingFirstPage') {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
@@ -64,7 +68,7 @@ export default function OrdersPage() {
         <div className="flex items-center gap-2 mb-4">
           <ClipboardList className="w-5 h-5 text-gray-700" />
           <h1 className="text-sm font-bold text-gray-900">
-            My Orders ({orders.length})
+            My Orders {loadStatus === 'CanLoadMore' ? `(${orders.length}+ loaded)` : `(${orders.length})`}
           </h1>
         </div>
 
@@ -73,6 +77,24 @@ export default function OrdersPage() {
             <OrderCard key={order.orderId} order={order} router={router} />
           ))}
         </div>
+
+        {/* Load More */}
+        {loadStatus === 'CanLoadMore' && (
+          <div className="mt-4 flex justify-center">
+            <button
+              onClick={() => loadMore(PAGE_SIZE)}
+              className="flex items-center gap-2 px-6 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all"
+            >
+              <ChevronDown className="w-4 h-4" />
+              Load more orders
+            </button>
+          </div>
+        )}
+        {loadStatus === 'LoadingMore' && (
+          <div className="mt-4 flex justify-center">
+            <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+          </div>
+        )}
       </div>
     </div>
   );
