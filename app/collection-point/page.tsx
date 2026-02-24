@@ -86,9 +86,8 @@ export default function CollectionPointPage() {
     }
   };
 
-  const isLoading = loadStatus === 'LoadingFirstPage' && !counts;
-
-  if (isLoading) {
+  // Only full-page-spin before counts arrive. Filter switches stay in-page.
+  if (counts === undefined) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
@@ -96,6 +95,7 @@ export default function CollectionPointPage() {
     );
   }
 
+  const isSwitchingFilter = loadStatus === 'LoadingFirstPage';
   const stats = counts ?? { confirmed: 0, packed: 0, collected: 0, total: 0 };
 
   return (
@@ -179,9 +179,9 @@ export default function CollectionPointPage() {
         </div>
 
         {/* Orders Grid */}
-        {loadStatus === 'LoadingFirstPage' ? (
-          <div className="flex justify-center py-8">
-            <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+        {isSwitchingFilter ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
           </div>
         ) : orders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">

@@ -59,9 +59,9 @@ export default function AdminPage() {
   // Derive unique collection points from loaded orders (grows as user loads more)
   const collectionPoints = Array.from(new Set((orders ?? []).map((o: any) => o.collectionPoint)));
 
-  const isLoading = loadStatus === 'LoadingFirstPage';
-
-  if (isLoading) {
+  // Only full-page-spin on the very first load (before counts arrive).
+  // Filter switches keep the page visible and show an inline spinner in the grid.
+  if (counts === undefined) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
@@ -69,6 +69,7 @@ export default function AdminPage() {
     );
   }
 
+  const isSwitchingFilter = loadStatus === 'LoadingFirstPage';
   const stats = counts ?? { confirmed: 0, packed: 0, collected: 0, total: 0 };
 
   return (
@@ -179,7 +180,11 @@ export default function AdminPage() {
           ))}
         </div>
 
-        {orders.length === 0 ? (
+        {isSwitchingFilter ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
+          </div>
+        ) : orders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
             <Package className="w-12 h-12 text-gray-300 mb-2" />
             <p className="text-sm text-gray-500">No orders found</p>
