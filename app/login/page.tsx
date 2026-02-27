@@ -1,9 +1,10 @@
 'use client';
 
 import { useQuery } from 'convex/react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MapPin, User, Shield, Package } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { useSetUser, useUser } from '../../components/UserContext';
 import { api } from '../../convex/_generated/api';
 
@@ -79,22 +80,19 @@ export default function LoginPage() {
 
   const handleUserSelection = () => {
     if (!selectedUser) {
-      alert('Please select a user');
+      toast.error('Please select a user to continue');
       return;
     }
 
     const userData = testUsers.find((u) => u.email === selectedUser);
     if (userData) {
       if (userData.role === 'admin') {
-        // Admins go directly to admin dashboard
         setUser(userData);
         router.push('/admin');
       } else if (userData.role === 'collection_point_manager') {
-        // Managers don't need to select collection point
         setUser(userData);
         router.push('/collection-point');
       } else {
-        // Customers need to select collection point
         setShowCollectionPointSelection(true);
       }
     }
@@ -102,13 +100,12 @@ export default function LoginPage() {
 
   const handleLogin = () => {
     if (!selectedCollectionPoint) {
-      alert('Please select a collection point');
+      toast.error('Please select a collection point');
       return;
     }
 
     const userData = testUsers.find((u) => u.email === selectedUser);
     if (userData) {
-      // Set user with selected collection point
       setUser({
         ...userData,
         collectionPoint: selectedCollectionPoint,
@@ -119,38 +116,41 @@ export default function LoginPage() {
 
   if (showCollectionPointSelection) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8">
+      <div className="min-h-screen bg-gray-50 flex items-start sm:items-center justify-center p-4 py-6">
+        <div className="max-w-lg w-full bg-white rounded-2xl shadow-lg p-5 sm:p-8">
+          <div className="flex items-center justify-center w-16 h-16 bg-primary-50 rounded-2xl mx-auto mb-6">
+            <MapPin className="w-8 h-8 text-primary-500" />
+          </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2 text-center">
-            Select Collection Point
+            Choose Your Collection Point
           </h1>
-          <p className="text-gray-600 mb-8 text-center">
-            Choose your nearest collection point for order pickup
+          <p className="text-gray-600 mb-8 text-center text-lg">
+            Pick the nearest location for order pickup
           </p>
 
           {!collectionPoints ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
             </div>
           ) : collectionPoints.length === 0 ? (
-            <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-sm text-yellow-800 mb-2">
-                ⚠️ No collection points available
+            <div className="mb-6 p-5 bg-yellow-50 border-2 border-yellow-200 rounded-xl">
+              <p className="text-base text-yellow-800 mb-1 font-semibold">
+                No collection points available
               </p>
-              <p className="text-xs text-yellow-700">
+              <p className="text-sm text-yellow-700">
                 Please initialize test users first.
               </p>
             </div>
           ) : (
-            <div className="space-y-3 mb-6">
+            <div className="space-y-3 mb-8">
               {collectionPoints.map((point) => (
                 <label
                   key={point}
-                  className="flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
-                  style={{
-                    borderColor:
-                      selectedCollectionPoint === point ? '#3b82f6' : '#e5e7eb',
-                  }}
+                  className={`flex items-center gap-4 p-5 border-2 rounded-xl cursor-pointer transition-all ${
+                    selectedCollectionPoint === point
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
+                  }`}
                 >
                   <input
                     type="radio"
@@ -158,28 +158,31 @@ export default function LoginPage() {
                     value={point}
                     checked={selectedCollectionPoint === point}
                     onChange={(e) => setSelectedCollectionPoint(e.target.value)}
-                    className="w-4 h-4"
+                    className="w-5 h-5 accent-primary-500"
                   />
-                  <span className="font-semibold text-gray-900">{point}</span>
+                  <div className="flex items-center gap-3">
+                    <MapPin className={`w-5 h-5 flex-shrink-0 ${selectedCollectionPoint === point ? 'text-primary-500' : 'text-gray-400'}`} />
+                    <span className="text-lg font-semibold text-gray-900">{point}</span>
+                  </div>
                 </label>
               ))}
             </div>
           )}
 
-          <div className="flex gap-3">
+          <div className="flex gap-4">
             <button
               onClick={() => {
                 setShowCollectionPointSelection(false);
                 setSelectedCollectionPoint('');
               }}
-              className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-semibold"
+              className="flex-1 py-4 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl font-semibold text-lg transition-colors"
             >
               Back
             </button>
             <button
               onClick={handleLogin}
               disabled={!selectedCollectionPoint}
-              className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 py-4 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-semibold text-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               Continue
             </button>
@@ -190,27 +193,38 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="max-w-4xl w-full bg-white rounded-2xl shadow-lg p-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2 text-center">
-         Login
-        </h1>
-       <br/>
+    <div className="min-h-screen bg-gray-50 flex items-start sm:items-center justify-center p-4 py-6">
+      <div className="max-w-4xl w-full bg-white rounded-2xl shadow-lg p-5 sm:p-8">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center w-16 h-16 bg-primary-50 rounded-2xl mx-auto mb-4">
+            <Package className="w-8 h-8 text-primary-500" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Welcome! Please Log In
+          </h1>
+          <p className="text-gray-600 text-lg">
+            Select your account below to continue
+          </p>
+        </div>
 
         {/* Admin Account */}
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">Admin</h2>
-          <div className="space-y-2">
+        <div className="mb-7">
+          <div className="flex items-center gap-2 mb-3">
+            <Shield className="w-5 h-5 text-purple-500" />
+            <h2 className="text-lg font-bold text-gray-900">Admin</h2>
+          </div>
+          <div className="space-y-3">
             {testUsers
               .filter((u) => u.role === 'admin')
               .map((userData) => (
                 <label
                   key={userData.email}
-                  className="flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
-                  style={{
-                    borderColor:
-                      selectedUser === userData.email ? '#3b82f6' : '#e5e7eb',
-                  }}
+                  className={`flex items-center gap-4 p-5 border-2 rounded-xl cursor-pointer transition-all ${
+                    selectedUser === userData.email
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
+                  }`}
                 >
                   <input
                     type="radio"
@@ -218,36 +232,45 @@ export default function LoginPage() {
                     value={userData.email}
                     checked={selectedUser === userData.email}
                     onChange={(e) => setSelectedUser(e.target.value)}
-                    className="w-4 h-4"
+                    className="w-5 h-5 accent-primary-500"
                   />
-                  <div>
-                    <p className="font-semibold text-gray-900">{userData.name}</p>
-                    <p className="text-xs text-gray-500">{userData.email}</p>
-                    <p className="text-xs text-purple-600">View all orders across collection points</p>
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+                      <Shield className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="text-lg font-semibold text-gray-900">{userData.name}</p>
+                      <p className="text-sm text-gray-500">{userData.email}</p>
+                      <p className="text-sm text-primary-600 font-medium mt-0.5">View all orders across collection points</p>
+                    </div>
                   </div>
                 </label>
               ))}
           </div>
         </div>
 
-        {/* Accounts - Side by Side */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        {/* Divider */}
+        <div className="border-t-2 border-gray-100 mb-7" />
+
+        {/* Accounts — Side by Side */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           {/* Customer Accounts */}
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">
-              Customer Accounts
-            </h2>
-            <div className="space-y-2">
+            <div className="flex items-center gap-2 mb-3">
+              <User className="w-5 h-5 text-blue-500" />
+              <h2 className="text-lg font-bold text-gray-900">Customer Accounts</h2>
+            </div>
+            <div className="space-y-3">
               {testUsers
                 .filter((u) => u.role === 'customer')
                 .map((userData) => (
                   <label
                     key={userData.email}
-                    className="flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
-                    style={{
-                      borderColor:
-                        selectedUser === userData.email ? '#3b82f6' : '#e5e7eb',
-                    }}
+                    className={`flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                      selectedUser === userData.email
+                        ? 'border-primary-500 bg-primary-50'
+                        : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
+                    }`}
                   >
                     <input
                       type="radio"
@@ -255,11 +278,16 @@ export default function LoginPage() {
                       value={userData.email}
                       checked={selectedUser === userData.email}
                       onChange={(e) => setSelectedUser(e.target.value)}
-                      className="w-4 h-4"
+                      className="w-5 h-5 accent-primary-500"
                     />
-                    <div>
-                      <p className="font-semibold text-gray-900">{userData.name}</p>
-                      <p className="text-xs text-gray-500">{userData.email}</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                        <User className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-base font-semibold text-gray-900">{userData.name}</p>
+                        <p className="text-sm text-gray-500">{userData.email}</p>
+                      </div>
                     </div>
                   </label>
                 ))}
@@ -268,20 +296,21 @@ export default function LoginPage() {
 
           {/* Collection Point Manager Accounts */}
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">
-              Collection Point Managers
-            </h2>
-            <div className="space-y-2">
+            <div className="flex items-center gap-2 mb-3">
+              <MapPin className="w-5 h-5 text-green-500" />
+              <h2 className="text-lg font-bold text-gray-900">Collection Point Managers</h2>
+            </div>
+            <div className="space-y-3">
               {testUsers
                 .filter((u) => u.role === 'collection_point_manager')
                 .map((userData) => (
                   <label
                     key={userData.email}
-                    className="flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
-                    style={{
-                      borderColor:
-                        selectedUser === userData.email ? '#3b82f6' : '#e5e7eb',
-                    }}
+                    className={`flex items-center gap-4 p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                      selectedUser === userData.email
+                        ? 'border-primary-500 bg-primary-50'
+                        : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
+                    }`}
                   >
                     <input
                       type="radio"
@@ -289,12 +318,17 @@ export default function LoginPage() {
                       value={userData.email}
                       checked={selectedUser === userData.email}
                       onChange={(e) => setSelectedUser(e.target.value)}
-                      className="w-4 h-4"
+                      className="w-5 h-5 accent-primary-500"
                     />
-                    <div>
-                      <p className="font-semibold text-gray-900">{userData.name}</p>
-                      <p className="text-xs text-gray-500">{userData.email}</p>
-                      <p className="text-xs text-blue-600">{userData.collectionPoint}</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                        <MapPin className="w-4 h-4 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-base font-semibold text-gray-900">{userData.name}</p>
+                        <p className="text-sm text-gray-500">{userData.email}</p>
+                        <p className="text-sm text-green-700 font-medium mt-0.5">{userData.collectionPoint}</p>
+                      </div>
                     </div>
                   </label>
                 ))}
@@ -305,7 +339,7 @@ export default function LoginPage() {
         {/* Login Button */}
         <button
           onClick={handleUserSelection}
-          className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold"
+          className="w-full py-5 bg-primary-500 hover:bg-primary-600 text-white rounded-xl font-bold text-xl transition-colors shadow-sm"
         >
           Continue
         </button>

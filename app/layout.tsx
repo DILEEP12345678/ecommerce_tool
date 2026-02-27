@@ -1,6 +1,7 @@
 import './globals.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
+import ToastProvider from '../components/ToastProvider';
 import { ConvexClientProvider } from './providers';
 import { UserProvider } from '../components/UserContext';
 
@@ -18,7 +19,13 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
+};
+
+export const viewport: Viewport = {
   themeColor: '#16a34a',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -42,6 +49,7 @@ export default function RootLayout({
         <ConvexClientProvider>
           <UserProvider>{children}</UserProvider>
         </ConvexClientProvider>
+        <ToastProvider />
       </body>
     </html>
   );

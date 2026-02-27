@@ -3,6 +3,7 @@
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { Loader2, Package, User, MapPin, ArrowLeft, Clock, CheckCircle2, Minus, Plus } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useRouter, useParams } from 'next/navigation';
 import { useCollectionPoint, useUser } from '../../../../components/UserContext';
 import { useEffect, useRef, useState } from 'react';
@@ -35,7 +36,6 @@ export default function OrderDetailPage() {
       const saved = localStorage.getItem(`packed-items-${params.orderId}`);
       if (!saved) return new Map();
       const parsed = JSON.parse(saved);
-      // Validate it's an array of [number, number] pairs before constructing the Map
       if (!Array.isArray(parsed) || !Array.isArray(parsed[0])) {
         localStorage.removeItem(`packed-items-${params.orderId}`);
         return new Map();
@@ -46,7 +46,6 @@ export default function OrderDetailPage() {
     }
   });
 
-  // Persist packed quantities to localStorage whenever they change
   useEffect(() => {
     if (!orderId) return;
     localStorage.setItem(`packed-items-${orderId}`, JSON.stringify(Array.from(packedQty.entries())));
@@ -62,14 +61,12 @@ export default function OrderDetailPage() {
     });
   };
 
-  // Direct query for single order - much faster!
   const order = useQuery(
     api.orders.getByOrderId,
     orderId ? { orderId } : 'skip'
   );
   const updateStatus = useMutation(api.orders.updateStatus);
 
-  // Redirect to login if not logged in or not a manager
   useEffect(() => {
     if (!user || user.role !== 'collection_point_manager') {
       router.push('/login');
@@ -79,7 +76,7 @@ export default function OrderDetailPage() {
   if (order === undefined) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+        <Loader2 className="w-10 h-10 text-primary-500 animate-spin" />
       </div>
     );
   }
@@ -87,7 +84,7 @@ export default function OrderDetailPage() {
   if (order === null) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-gray-500">Order not found</p>
+        <p className="text-gray-500 text-lg">Order not found</p>
       </div>
     );
   }
@@ -103,39 +100,39 @@ export default function OrderDetailPage() {
         setPackedQty(new Map());
       }
     } catch (error) {
-      alert('Failed to update order status');
+      toast.error('Failed to update order status. Please try again.');
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="max-w-2xl mx-auto px-4 py-4 sm:py-6 pb-24 sm:pb-6">
       {/* Back Button */}
       <button
         onClick={() => router.push('/collection-point')}
-        className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors"
+        className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors py-2"
       >
-        <ArrowLeft className="w-4 h-4" />
-        <span className="text-sm font-medium">Back to Dashboard</span>
+        <ArrowLeft className="w-5 h-5" />
+        <span className="text-base font-semibold">Back to Dashboard</span>
       </button>
 
       {/* Order Header */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-        <div className="flex items-start justify-between mb-4">
+      <div className="bg-white rounded-2xl border-2 border-gray-100 p-6 mb-5">
+        <div className="flex items-start justify-between mb-5">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            <h1 className="text-2xl font-bold text-gray-900 mb-3">
               Order #{order.orderId.split('-')[1]}
             </h1>
-            <div className="flex items-center gap-2 text-gray-600 mb-1">
-              <User className="w-4 h-4" />
-              <span className="text-sm">Customer: {order.username}</span>
+            <div className="flex items-center gap-2 mb-2">
+              <User className="w-5 h-5 text-gray-400" />
+              <span className="text-base text-gray-700">Customer: <strong>{order.username}</strong></span>
             </div>
-            <div className="flex items-center gap-2 text-gray-600 mb-1">
-              <MapPin className="w-4 h-4" />
-              <span className="text-sm">Collection Point: {order.collectionPoint}</span>
+            <div className="flex items-center gap-2 mb-2">
+              <MapPin className="w-5 h-5 text-gray-400" />
+              <span className="text-base text-gray-700">Collection Point: <strong>{order.collectionPoint}</strong></span>
             </div>
-            <div className="flex items-center gap-2 text-gray-600">
-              <Clock className="w-4 h-4" />
-              <span className="text-sm">
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-gray-400" />
+              <span className="text-base text-gray-500">
                 {new Date(order.createdAt).toLocaleString('en-US', {
                   month: 'long',
                   day: 'numeric',
@@ -146,54 +143,47 @@ export default function OrderDetailPage() {
               </span>
             </div>
           </div>
-          <div>
-            <span
-              className={`px-4 py-2 text-sm font-semibold rounded-lg ${getStatusColor(
-                order.status
-              )}`}
-            >
-              {order.status.toUpperCase()}
-            </span>
-          </div>
+          <span className={`px-4 py-2 text-base font-bold rounded-xl ${getStatusColor(order.status)}`}>
+            {order.status.toUpperCase()}
+          </span>
         </div>
       </div>
 
       {/* Order Items */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-base font-semibold text-gray-900">Order Items</h2>
+      <div className="bg-white rounded-2xl border-2 border-gray-100 p-6 mb-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-900">Order Items</h2>
           {order.status === 'confirmed' && (() => {
             const doneCount = order.items.filter((_: any, i: number) =>
               (packedQty.get(i) ?? 0) >= order.items[i].quantity
             ).length;
             return (
-              <span className="text-xs text-gray-500">
-                {doneCount}/{order.items.length} items complete
+              <span className="text-base font-semibold text-gray-600 bg-gray-100 px-3 py-1 rounded-lg">
+                {doneCount}/{order.items.length} packed
               </span>
             );
           })()}
         </div>
-        <div className="space-y-3">
+        <div className="space-y-4">
           {order.items.map((item: any, index: number) => {
             const packed = packedQty.get(index) ?? 0;
             const total = item.quantity;
             const isComplete = packed >= total;
             const pct = Math.round((packed / total) * 100);
 
-            const qtyColor = getQtyColor(total);
             return (
               <div
                 key={index}
-                className={`p-3 rounded-lg border transition-colors ${
+                className={`p-4 rounded-xl border-2 transition-colors ${
                   isComplete
                     ? 'bg-green-50 border-green-200'
-                    : `${qtyColor.bg} ${qtyColor.border}`
+                    : 'bg-gray-50 border-gray-100'
                 }`}
               >
                 {/* Top row: image + name + done icon */}
-                <div className="flex items-center gap-3 mb-2">
+                <div className="flex items-center gap-4 mb-3">
                   <div
-                    className="relative w-10 h-10 bg-gray-100 rounded overflow-hidden flex-shrink-0 cursor-zoom-in"
+                    className="relative w-16 h-16 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0 cursor-zoom-in"
                     onClick={() => PRODUCT_IMAGES[item.itemId] && setZoomedImage({ src: PRODUCT_IMAGES[item.itemId], alt: item.itemName })}
                   >
                     {PRODUCT_IMAGES[item.itemId] ? (
@@ -204,24 +194,27 @@ export default function OrderDetailPage() {
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
-                        <Package className="w-4 h-4 text-gray-400" />
+                        <Package className="w-7 h-7 text-gray-400" />
                       </div>
                     )}
                   </div>
-                  <span className={`flex-1 text-sm font-medium ${isComplete ? 'text-green-700' : 'text-gray-900'}`}>
-                    {item.itemName}
-                  </span>
+                  <div className="flex-1">
+                    <span className={`text-base font-bold ${isComplete ? 'text-green-700' : 'text-gray-900'}`}>
+                      {item.itemName}
+                    </span>
+                    <p className="text-sm text-gray-500">{item.itemId}</p>
+                  </div>
                   {isComplete && (
-                    <CheckCircle2 className="w-5 h-5 text-green-500 flex-shrink-0" />
+                    <CheckCircle2 className="w-7 h-7 text-green-500 flex-shrink-0" />
                   )}
                 </div>
 
-                {/* Progress bar */}
+                {/* Progress bar + controls */}
                 {order.status === 'confirmed' && (
                   <>
-                    <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                    <div className="w-full bg-gray-200 rounded-full h-3 mb-3">
                       <div
-                        className={`h-2 rounded-full transition-all duration-300 ${
+                        className={`h-3 rounded-full transition-all duration-300 ${
                           pct === 0 ? 'bg-transparent' :
                           pct <= 33 ? 'bg-red-500' :
                           pct <= 66 ? 'bg-orange-500' :
@@ -232,18 +225,18 @@ export default function OrderDetailPage() {
                       />
                     </div>
 
-                    {/* Bottom row: −/+ controls + count */}
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-500">{pct}% packed</span>
-                      <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600 font-medium">{pct}% packed</span>
+                      <div className="flex items-center gap-3">
                         <button
                           onClick={() => updatePackedQty(index, -1, total)}
                           disabled={packed === 0}
-                          className="w-7 h-7 flex items-center justify-center rounded-full border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          className="w-10 h-10 flex items-center justify-center rounded-xl border-2 border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          aria-label="Decrease packed quantity"
                         >
-                          <Minus className="w-3 h-3" />
+                          <Minus className="w-4 h-4" />
                         </button>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2">
                           <input
                             type="number"
                             min={0}
@@ -267,25 +260,25 @@ export default function OrderDetailPage() {
                                 }
                               }
                             }}
-                            className="w-12 text-center text-sm font-semibold text-gray-900 border border-gray-300 rounded-md py-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                            className="w-14 text-center text-base font-bold text-gray-900 border-2 border-gray-200 rounded-xl py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-400"
                           />
-                          <span className="text-sm text-gray-500">/ {total}</span>
+                          <span className="text-base font-semibold text-gray-500">/ {total}</span>
                         </div>
                         <button
                           onClick={() => updatePackedQty(index, 1, total)}
                           disabled={packed >= total}
-                          className="w-7 h-7 flex items-center justify-center rounded-full border border-gray-300 text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          className="w-10 h-10 flex items-center justify-center rounded-xl border-2 border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                          aria-label="Increase packed quantity"
                         >
-                          <Plus className="w-3 h-3" />
+                          <Plus className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
                   </>
                 )}
 
-                {/* For non-confirmed orders, just show quantity */}
                 {order.status !== 'confirmed' && (
-                  <div className="text-xs text-gray-500 mt-1">Qty: {total}</div>
+                  <div className="text-base font-semibold text-gray-600 mt-1">Quantity: {total}</div>
                 )}
               </div>
             );
@@ -294,8 +287,8 @@ export default function OrderDetailPage() {
       </div>
 
       {/* Action Buttons */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Order Actions</h2>
+      <div className="bg-white rounded-2xl border-2 border-gray-100 p-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-5">Order Actions</h2>
 
         {order.status === 'confirmed' && (() => {
           const allComplete = order.items.length > 0 &&
@@ -303,16 +296,16 @@ export default function OrderDetailPage() {
           return (
             <div>
               {!allComplete && (
-                <p className="text-sm text-gray-500 text-center py-2">
+                <p className="text-base text-gray-500 text-center mb-4 p-3 bg-gray-50 rounded-xl">
                   Pack all items above to mark this order as packed
                 </p>
               )}
               <button
                 onClick={() => handleStatusChange('packed')}
                 disabled={!allComplete}
-                className={`w-full py-3 rounded-lg text-sm font-semibold transition-colors ${
+                className={`w-full py-5 rounded-xl text-lg font-bold transition-colors ${
                   allComplete
-                    ? 'bg-blue-500 hover:bg-blue-600 text-white'
+                    ? 'bg-primary-500 hover:bg-primary-600 text-white'
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 }`}
               >
@@ -323,16 +316,16 @@ export default function OrderDetailPage() {
         })()}
 
         {order.status === 'packed' && (
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-3">
             <button
               onClick={() => handleStatusChange('collected')}
-              className="flex-1 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-semibold transition-colors"
+              className="w-full py-5 bg-green-500 hover:bg-green-600 text-white rounded-xl text-lg font-bold transition-colors"
             >
               Mark as Collected
             </button>
             <button
               onClick={() => handleStatusChange('confirmed')}
-              className="px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white rounded-lg text-sm font-semibold transition-colors"
+              className="w-full py-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-base font-semibold transition-colors"
             >
               Move Back to Confirmed
             </button>
@@ -340,8 +333,9 @@ export default function OrderDetailPage() {
         )}
 
         {order.status === 'collected' && (
-          <div className="text-center py-4 bg-green-50 text-green-700 rounded-lg border border-green-200">
-            <p className="text-sm font-semibold">✓ This order has been collected</p>
+          <div className="text-center py-5 bg-green-50 text-green-700 rounded-xl border-2 border-green-200">
+            <CheckCircle2 className="w-10 h-10 text-green-500 mx-auto mb-2" />
+            <p className="text-lg font-bold">This order has been collected</p>
           </div>
         )}
       </div>
@@ -349,19 +343,19 @@ export default function OrderDetailPage() {
       {/* Image zoom modal */}
       {zoomedImage && (
         <div
-          className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-fade-in"
           onClick={() => setZoomedImage(null)}
         >
-          <div className="relative max-w-lg w-full" onClick={e => e.stopPropagation()}>
+          <div className="relative max-w-lg w-full animate-fade-in-scale" onClick={e => e.stopPropagation()}>
             <img
               src={zoomedImage.src}
               alt={zoomedImage.alt}
-              className="w-full h-auto rounded-xl shadow-2xl object-cover"
+              className="w-full h-auto rounded-2xl shadow-2xl object-cover"
             />
-            <p className="text-white text-sm font-medium text-center mt-3">{zoomedImage.alt}</p>
+            <p className="text-white text-base font-semibold text-center mt-4">{zoomedImage.alt}</p>
             <button
               onClick={() => setZoomedImage(null)}
-              className="absolute -top-3 -right-3 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg text-gray-600 hover:text-gray-900 text-lg font-bold"
+              className="absolute -top-4 -right-4 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg text-gray-600 hover:text-gray-900 text-xl font-bold"
             >
               ×
             </button>
@@ -372,19 +366,11 @@ export default function OrderDetailPage() {
   );
 }
 
-function getQtyColor(qty: number): { bg: string; border: string } {
-  if (qty <= 1) return { bg: 'bg-gray-50',    border: 'border-gray-200'  };
-  if (qty === 2) return { bg: 'bg-blue-50',   border: 'border-blue-200'  };
-  if (qty === 3) return { bg: 'bg-purple-50', border: 'border-purple-200'};
-  if (qty === 4) return { bg: 'bg-orange-50', border: 'border-orange-200'};
-  return               { bg: 'bg-red-50',    border: 'border-red-200'   };
-}
-
 function getStatusColor(status: string) {
   const colors: Record<string, string> = {
-    confirmed: 'bg-yellow-100 text-yellow-800 border border-yellow-200',
-    packed: 'bg-blue-100 text-blue-800 border border-blue-200',
-    collected: 'bg-green-100 text-green-800 border border-green-200',
+    confirmed: 'bg-yellow-100 text-yellow-800 border-2 border-yellow-200',
+    packed: 'bg-blue-100 text-blue-800 border-2 border-blue-200',
+    collected: 'bg-green-100 text-green-800 border-2 border-green-200',
   };
   return colors[status] || 'bg-gray-100 text-gray-800';
 }
