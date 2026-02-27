@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(ls:*)",
-      "Bash(C:/Users/JC/ecommerceTool/convex/orders.ts:*)"
+      "Bash(C:/Users/JC/ecommerceTool/convex/orders.ts:*)",
+      "Bash(python3:*)",
+      "Bash(cd:*)",
+      "Bash(tail:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)"
     ]
   }
 }

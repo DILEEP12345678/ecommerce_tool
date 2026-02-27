@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { createContext, useContext, useState, ReactNode } from 'react';
 
 interface User {
   email: string;
@@ -48,15 +48,18 @@ export function useSetUser() {
 }
 
 export function UserProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-
-  // Load user from localStorage on mount
-  useEffect(() => {
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
+  // Read localStorage synchronously so the user is available on the very first render.
+  // This prevents page guards (useEffect checking !user) from firing before the
+  // saved session is loaded, which caused an immediate redirect back to /login.
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const saved = localStorage.getItem('currentUser');
+      return saved ? (JSON.parse(saved) as User) : null;
+    } catch {
+      return null;
     }
-  }, []);
+  });
 
   // Save user to localStorage when it changes
   const handleSetUser = (newUser: User | null) => {

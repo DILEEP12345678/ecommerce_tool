@@ -4,6 +4,7 @@ import { useQuery } from 'convex/react';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { useSetUser, useUser } from '../components/UserContext';
 import { api } from '../convex/_generated/api';
 
@@ -79,7 +80,7 @@ export default function LoginPage() {
 
   const handleUserSelection = () => {
     if (!selectedUser) {
-      alert('Please select a user');
+      toast.error('Please select a user to continue');
       return;
     }
 
@@ -102,7 +103,7 @@ export default function LoginPage() {
 
   const handleLogin = () => {
     if (!selectedCollectionPoint) {
-      alert('Please select a collection point');
+      toast.error('Please select a collection point');
       return;
     }
 
@@ -130,7 +131,7 @@ export default function LoginPage() {
 
           {!collectionPoints ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+              <Loader2 className="w-6 h-6 text-primary-500 animate-spin" />
             </div>
           ) : collectionPoints.length === 0 ? (
             <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -149,7 +150,7 @@ export default function LoginPage() {
                   className="flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
                   style={{
                     borderColor:
-                      selectedCollectionPoint === point ? '#3b82f6' : '#e5e7eb',
+                      selectedCollectionPoint === point ? '#10b981' : '#e5e7eb',
                   }}
                 >
                   <input
@@ -179,7 +180,7 @@ export default function LoginPage() {
             <button
               onClick={handleLogin}
               disabled={!selectedCollectionPoint}
-              className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Continue
             </button>
@@ -211,7 +212,7 @@ export default function LoginPage() {
                   className="flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
                   style={{
                     borderColor:
-                      selectedUser === userData.email ? '#3b82f6' : '#e5e7eb',
+                      selectedUser === userData.email ? '#10b981' : '#e5e7eb',
                   }}
                 >
                   <input
@@ -225,7 +226,7 @@ export default function LoginPage() {
                   <div>
                     <p className="font-semibold text-gray-900">{userData.name}</p>
                     <p className="text-xs text-gray-500">{userData.email}</p>
-                    <p className="text-xs text-purple-600">View all orders across collection points</p>
+                    <p className="text-xs text-primary-600">View all orders across collection points</p>
                   </div>
                 </label>
               ))}
@@ -248,7 +249,7 @@ export default function LoginPage() {
                     className="flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
                     style={{
                       borderColor:
-                        selectedUser === userData.email ? '#3b82f6' : '#e5e7eb',
+                        selectedUser === userData.email ? '#10b981' : '#e5e7eb',
                     }}
                   >
                     <input
@@ -282,7 +283,7 @@ export default function LoginPage() {
                     className="flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
                     style={{
                       borderColor:
-                        selectedUser === userData.email ? '#3b82f6' : '#e5e7eb',
+                        selectedUser === userData.email ? '#10b981' : '#e5e7eb',
                     }}
                   >
                     <input
@@ -307,7 +308,7 @@ export default function LoginPage() {
         {/* Login Button */}
         <button
           onClick={handleUserSelection}
-          className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold"
+          className="w-full py-3 bg-primary-500 hover:bg-primary-600 text-white rounded-lg font-semibold"
         >
           Continue
         </button>
