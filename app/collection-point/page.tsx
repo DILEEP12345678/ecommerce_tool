@@ -2,7 +2,11 @@
 
 import { usePaginatedQuery, useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
-import { Loader2, Package, User, MapPin, ShoppingCart, CheckCircle, ChevronDown } from 'lucide-react';
+import {
+  Loader2, Package, User, MapPin, ShoppingCart,
+  CheckCircle, ChevronDown, ChevronRight, Calendar,
+  CheckSquare, Square,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useCollectionPoint, useUser } from '../../components/UserContext';
 import { useRouter } from 'next/navigation';
@@ -10,7 +14,6 @@ import { useEffect, useState, memo } from 'react';
 
 const PAGE_SIZE = 40;
 
-// Product image mapping
 const PRODUCT_IMAGES: Record<string, string> = {
   'PROD-001': 'https://images.unsplash.com/photo-1568702846914-96b305d2aaeb?w=400&h=400&fit=crop',
   'PROD-002': 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=400&h=400&fit=crop',
@@ -31,6 +34,7 @@ export default function CollectionPointPage() {
   const [selectedStatus, setSelectedStatus] = useState<'confirmed' | 'packed' | 'collected'>('confirmed');
   const [checkedOrders, setCheckedOrders] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
+  const [packListOpen, setPackListOpen] = useState(true);
   const updateStatus = useMutation(api.orders.updateStatus);
 
   useEffect(() => {
@@ -45,9 +49,7 @@ export default function CollectionPointPage() {
 
   const { results: orders, status: loadStatus, loadMore } = usePaginatedQuery(
     api.orders.listAllPaginated,
-    collectionPoint
-      ? { collectionPoint, status: selectedStatus }
-      : 'skip',
+    collectionPoint ? { collectionPoint, status: selectedStatus } : 'skip',
     { initialNumItems: PAGE_SIZE }
   );
 
@@ -74,27 +76,38 @@ export default function CollectionPointPage() {
       toast.success(`Marked ${checkedOrders.size} order${checkedOrders.size > 1 ? 's' : ''} as collected!`);
     } catch (error) {
       toast.error('Failed to update orders. Please try again.');
-      console.error(error);
     } finally {
       setIsProcessing(false);
     }
   };
 
+  const handleSelectAll = () => {
+    if (checkedOrders.size === orders.length) {
+      setCheckedOrders(new Set());
+    } else {
+      setCheckedOrders(new Set(orders.map((o: any) => o.orderId)));
+    }
+  };
+
+  const today = new Date().toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric',
+  });
+
   if (counts === undefined) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-4 sm:py-6 pb-32 sm:pb-6">
-        <div className="h-8 bg-gray-200 rounded w-64 mb-5 animate-pulse" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl border-2 border-gray-100 p-5 animate-pulse">
-              <div className="flex justify-between mb-3">
-                <div className="h-5 bg-gray-200 rounded w-20" />
-                <div className="h-6 bg-gray-200 rounded w-24" />
-              </div>
-              <div className="h-4 bg-gray-100 rounded w-3/4 mb-2" />
-              <div className="h-20 bg-gray-100 rounded mb-3" />
-            </div>
-          ))}
+      <div className="pb-24 sm:pb-6">
+        {/* Skeleton header */}
+        <div className="bg-primary-600 px-4 pt-6 pb-8">
+          <div className="h-7 bg-white/20 rounded-lg w-56 mb-2 animate-pulse" />
+          <div className="h-4 bg-white/10 rounded w-36 animate-pulse" />
+        </div>
+        <div className="px-4 -mt-4">
+          <div className="bg-white rounded-2xl shadow-sm p-1 mb-5 animate-pulse h-14" />
+          <div className="space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl p-4 animate-pulse h-24" />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -102,99 +115,129 @@ export default function CollectionPointPage() {
 
   const isSwitchingFilter = loadStatus === 'LoadingFirstPage';
   const stats = counts ?? { confirmed: 0, packed: 0, collected: 0, total: 0 };
+  const allSelected = orders.length > 0 && checkedOrders.size === orders.length;
+
+  const tabs = [
+    { key: 'confirmed', label: 'Confirmed', count: stats.confirmed },
+    { key: 'packed',    label: 'Packed',    count: stats.packed    },
+    { key: 'collected', label: 'Collected', count: stats.collected },
+  ] as const;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-4 sm:py-6 pb-32 sm:pb-6">
-      {/* Header */}
-      <div className="mb-6 flex items-center gap-3">
-        <MapPin className="w-7 h-7 text-primary-500" />
-        <h1 className="text-2xl font-bold text-gray-900">{collectionPoint}</h1>
+    <div className="min-h-screen bg-gray-50 pb-32 sm:pb-6">
+
+      {/* ── HERO HEADER ─────────────────────────────────────── */}
+      <div className="bg-gradient-to-br from-primary-600 to-primary-700 px-4 pt-3 pb-6">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center gap-2 mb-0.5">
+            <MapPin className="w-4 h-4 text-white/80" />
+            <h1 className="text-lg font-bold text-white truncate">{collectionPoint}</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <Calendar className="w-3.5 h-3.5 text-white/60" />
+            <p className="text-xs text-white/70">{today}</p>
+          </div>
+        </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-3">
-        {[
-          { key: 'confirmed', label: 'Confirmed', count: stats.confirmed, active: 'bg-yellow-600 border-yellow-700', inactive: 'bg-yellow-50 border-yellow-200', activeText: 'text-white', inactiveText: 'text-yellow-900', activeLabel: 'text-yellow-100', inactiveLabel: 'text-yellow-700' },
-          { key: 'packed',    label: 'Packed',    count: stats.packed,    active: 'bg-blue-600 border-blue-700',   inactive: 'bg-blue-50 border-blue-200',   activeText: 'text-white', inactiveText: 'text-blue-900',   activeLabel: 'text-blue-100',   inactiveLabel: 'text-blue-700'   },
-          { key: 'collected', label: 'Collected', count: stats.collected, active: 'bg-green-600 border-green-700', inactive: 'bg-green-50 border-green-200', activeText: 'text-white', inactiveText: 'text-green-900', activeLabel: 'text-green-100', inactiveLabel: 'text-green-700' },
-        ].map(({ key, label, count, active, inactive, activeText, inactiveText, activeLabel, inactiveLabel }) => (
-          <button
-            key={key}
-            onClick={() => setSelectedStatus(key as any)}
-            className={`flex flex-col sm:flex-row items-center sm:items-start gap-1 sm:gap-3 px-3 sm:px-5 py-3 sm:py-4 rounded-2xl border-2 transition-all ${selectedStatus === key ? active : inactive} hover:shadow-md`}
-          >
-            <Package className={`w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0 ${selectedStatus === key ? activeLabel : inactiveLabel}`} />
-            <div className="text-center sm:text-left">
-              <p className={`text-xs sm:text-sm font-semibold ${selectedStatus === key ? activeLabel : inactiveLabel}`}>{label}</p>
-              <p className={`text-xl sm:text-2xl font-bold ${selectedStatus === key ? activeText : inactiveText}`}>{count}</p>
-            </div>
-          </button>
-        ))}
-      </div>
+      <div className="max-w-4xl mx-auto px-4 -mt-4">
 
-      {/* Items to Pack */}
-      {selectedStatus === 'confirmed' && (
-        confirmedItemsList === undefined ? (
-          <div className="mb-6 flex justify-center py-5">
-            <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
-          </div>
-        ) : confirmedItemsList.length > 0 && (
-          <div className="mb-6 bg-white rounded-2xl border-2 border-gray-100 p-5">
-            <div className="flex items-center gap-3 mb-4">
-              <ShoppingCart className="w-6 h-6 text-gray-700" />
-              <h2 className="text-lg font-bold text-gray-900">
-                Items to Pack ({confirmedItemsList.length} products)
-              </h2>
-            </div>
-            <div className="overflow-x-auto rounded-xl border-2 border-gray-100">
-              <table className="w-full min-w-[320px] bg-white">
-                <thead className="bg-gray-50 border-b-2 border-gray-100">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-bold text-gray-800 whitespace-nowrap">Item ID</th>
-                    <th className="px-4 py-3 text-left text-sm font-bold text-gray-800">Item Name</th>
-                    <th className="px-4 py-3 text-right text-sm font-bold text-gray-800 whitespace-nowrap">Qty Needed</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {confirmedItemsList.map((item: any) => (
-                    <tr key={item.itemId} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{item.itemId}</td>
-                      <td className="px-4 py-3 text-base font-semibold text-gray-900">{item.itemName}</td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-bold bg-gray-100 text-gray-900">
-                          {item.quantity}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )
-      )}
-
-      {/* Orders Section */}
-      <div className="bg-white rounded-2xl border-2 border-gray-100 p-5">
-        <div className="flex items-center gap-2 mb-5">
-          <Package className="w-6 h-6 text-gray-700" />
-          <h2 className="text-lg font-bold text-gray-900">
-            Orders {loadStatus === 'CanLoadMore' ? `(${orders.length}+ loaded)` : `(${orders.length})`}
-          </h2>
+        {/* ── STATUS TABS ──────────────────────────────────── */}
+        <div className="bg-white rounded-2xl shadow-md p-1 mb-3 flex gap-1">
+          {tabs.map(({ key, label, count }) => (
+            <button
+              key={key}
+              onClick={() => setSelectedStatus(key)}
+              className={`flex-1 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 px-2 rounded-xl transition-all text-sm font-semibold ${
+                selectedStatus === key
+                  ? 'bg-primary-600 text-white shadow-sm'
+                  : 'text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              <span className="hidden sm:inline">{label}</span>
+              <span className="sm:hidden text-xs font-bold">{label.slice(0, 4)}</span>
+              <span className={`text-base sm:text-sm font-bold tabular-nums ${
+                selectedStatus === key ? 'text-white' : 'text-gray-800'
+              }`}>
+                {count}
+              </span>
+            </button>
+          ))}
         </div>
 
+        {/* ── PACK LIST (confirmed tab only) ───────────────── */}
+        {selectedStatus === 'confirmed' && confirmedItemsList !== undefined && confirmedItemsList.length > 0 && (
+          <div className="bg-white rounded-2xl shadow-sm mb-3 overflow-hidden">
+            <button
+              onClick={() => setPackListOpen(o => !o)}
+              className="w-full flex items-center justify-between px-3 py-2.5"
+            >
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="w-4 h-4 text-primary-500" />
+                <span className="font-bold text-gray-900 text-sm">Pack List</span>
+                <span className="text-xs bg-primary-100 text-primary-700 font-bold px-2 py-0.5 rounded-full">
+                  {confirmedItemsList.length} products
+                </span>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${packListOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {packListOpen && (
+              <div className="px-3 pb-3 flex flex-wrap gap-1.5">
+                {confirmedItemsList.map((item: any) => (
+                  <span
+                    key={item.itemId}
+                    className="inline-flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-full px-2.5 py-1 text-xs font-semibold text-gray-800"
+                  >
+                    <span className="text-gray-400 text-xs">{item.itemId}</span>
+                    {item.itemName}
+                    <span className="bg-primary-100 text-primary-700 font-bold text-xs px-1.5 py-0.5 rounded-full">
+                      ×{item.quantity}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {selectedStatus === 'confirmed' && confirmedItemsList === undefined && (
+          <div className="flex justify-center py-3 mb-4">
+            <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+          </div>
+        )}
+
+        {/* ── ORDER LIST HEADER ─────────────────────────────── */}
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-semibold text-gray-500">
+            {isSwitchingFilter ? 'Loading…' : `${loadStatus === 'CanLoadMore' ? `${orders.length}+` : orders.length} orders`}
+          </p>
+          {selectedStatus === 'packed' && orders.length > 0 && (
+            <button
+              onClick={handleSelectAll}
+              className="flex items-center gap-1.5 text-sm font-semibold text-primary-600 hover:text-primary-700"
+            >
+              {allSelected
+                ? <><CheckSquare className="w-4 h-4" /> Deselect All</>
+                : <><Square className="w-4 h-4" /> Select All ({orders.length})</>
+              }
+            </button>
+          )}
+        </div>
+
+        {/* ── ORDER CARDS ──────────────────────────────────── */}
         {isSwitchingFilter ? (
           <div className="flex justify-center py-16">
             <Loader2 className="w-8 h-8 text-primary-400 animate-spin" />
           </div>
         ) : orders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 bg-gray-50 rounded-xl">
+          <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl shadow-sm">
             <Package className="w-16 h-16 text-gray-200 mb-3" />
-            <p className="text-base text-gray-500 font-medium">No orders found</p>
+            <p className="text-base font-semibold text-gray-400">No {selectedStatus} orders</p>
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0">
               {orders.map((order: any) => (
                 <OrderCard
                   key={order.orderId}
@@ -213,43 +256,45 @@ export default function CollectionPointPage() {
             </div>
 
             {loadStatus === 'CanLoadMore' && (
-              <div className="mt-6 flex justify-center">
+              <div className="mt-5 flex justify-center">
                 <button
                   onClick={() => loadMore(PAGE_SIZE)}
-                  className="flex items-center gap-2 px-8 py-4 bg-white border-2 border-gray-300 rounded-xl text-base font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all"
+                  className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:border-gray-300 transition-all shadow-sm"
                 >
-                  <ChevronDown className="w-5 h-5" />
-                  Load more orders
+                  <ChevronDown className="w-4 h-4" />
+                  Load more
                 </button>
               </div>
             )}
             {loadStatus === 'LoadingMore' && (
-              <div className="mt-6 flex justify-center">
-                <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+              <div className="mt-5 flex justify-center">
+                <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
               </div>
             )}
           </>
         )}
       </div>
 
-      {/* Mark as Collected — fixed bottom bar, sits above mobile bottom nav */}
+      {/* ── MARK AS COLLECTED CTA ────────────────────────── */}
       {selectedStatus === 'packed' && checkedOrders.size > 0 && (
-        <div className="fixed bottom-16 sm:bottom-0 left-0 right-0 bg-white border-t-2 border-gray-200 shadow-xl p-4 sm:p-5 z-40 animate-slide-up">
-          <div className="max-w-7xl mx-auto flex justify-center">
-            <button
-              onClick={handleCollectionCompleted}
-              disabled={isProcessing}
-              className={`flex items-center gap-3 px-10 py-4 rounded-xl font-bold text-lg text-white transition-all ${
-                isProcessing
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-green-500 hover:bg-green-600 shadow-md hover:shadow-lg'
-              }`}
-            >
-              <CheckCircle className="w-6 h-6" />
-              {isProcessing
-                ? 'Processing...'
-                : `Mark as Collected (${checkedOrders.size} order${checkedOrders.size > 1 ? 's' : ''})`}
-            </button>
+        <div className="fixed bottom-16 sm:bottom-0 left-0 right-0 z-40 animate-slide-up">
+          <div className="bg-white border-t border-gray-100 shadow-2xl px-4 py-3">
+            <div className="max-w-4xl mx-auto">
+              <button
+                onClick={handleCollectionCompleted}
+                disabled={isProcessing}
+                className={`w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-bold text-lg text-white transition-all ${
+                  isProcessing
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-green-500 hover:bg-green-600 active:bg-green-700 shadow-lg'
+                }`}
+              >
+                <CheckCircle className="w-6 h-6" />
+                {isProcessing
+                  ? 'Processing…'
+                  : `Mark ${checkedOrders.size} Order${checkedOrders.size > 1 ? 's' : ''} as Collected`}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -257,6 +302,7 @@ export default function CollectionPointPage() {
   );
 }
 
+// ── ORDER CARD ───────────────────────────────────────────
 const OrderCard = memo(({ order, router, isChecked, onToggleCheck }: {
   order: any;
   router: any;
@@ -264,90 +310,98 @@ const OrderCard = memo(({ order, router, isChecked, onToggleCheck }: {
   onToggleCheck: (orderId: string) => void;
 }) => {
   const isPacked = order.status === 'packed';
+  const previewItems = order.items.slice(0, 3);
+  const extraCount = order.items.length - previewItems.length;
+
+  const timeAgo = (() => {
+    const diff = Date.now() - order.createdAt;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  })();
 
   return (
     <div
-      className={`bg-gray-50 rounded-2xl border-2 border-gray-100 p-5 hover:shadow-md hover:border-primary-300 transition-all flex flex-col relative ${
-        isChecked ? 'opacity-50' : ''
+      className={`bg-white rounded-2xl shadow-sm border transition-all ${
+        isChecked
+          ? 'border-green-300 bg-green-50 shadow-md'
+          : 'border-transparent hover:shadow-md'
       }`}
     >
-      {/* Checkbox — only for packed orders */}
-      {isPacked && (
-        <div
-          className="absolute top-4 left-4 z-10"
-          onClick={(e) => { e.stopPropagation(); onToggleCheck(order.orderId); }}
-        >
-          <input
-            type="checkbox"
-            checked={isChecked}
-            onChange={() => {}}
-            className="w-6 h-6 cursor-pointer accent-blue-500"
-          />
-        </div>
-      )}
-
-      <div
-        onClick={() => router.push(`/collection-point/orders/${order.orderId}`)}
-        className="cursor-pointer"
-      >
-        <div className="mb-3">
-          <div className="flex items-center justify-between mb-2">
-            <p className={`text-base font-bold text-gray-900 ${isPacked ? 'ml-9' : ''}`}>
-              Order #{order.orderId.split('-')[1]}
-            </p>
-            <span className={`px-3 py-1 text-sm font-bold rounded-lg ${getStatusColor(order.status)}`}>
-              {order.status.toUpperCase()}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 mb-1">
-            <User className="w-4 h-4 text-gray-400" />
-            <p className="text-sm text-gray-600 font-medium truncate">{order.username}</p>
-          </div>
-          <p className="text-sm text-gray-400">
-            {new Date(order.createdAt).toLocaleDateString('en-US', {
-              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-            })}
-          </p>
-        </div>
-
-        <div className="mb-3 bg-white rounded-xl px-4 py-3 border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <div className="relative w-12 h-12 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
-                {PRODUCT_IMAGES[order.items[0].itemId] ? (
-                  <img
-                    src={PRODUCT_IMAGES[order.items[0].itemId]}
-                    alt={order.items[0].itemName}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Package className="w-6 h-6 text-gray-400" />
-                  </div>
-                )}
-              </div>
-              <span className="text-base font-semibold text-gray-900 truncate">
-                {order.items[0].itemName}
+      <div className="p-4">
+        {/* Row 1: order # + customer + time */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-sm font-bold text-gray-900">
+                #{order.orderId.split('-')[1]}
+              </span>
+              <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${getStatusPill(order.status)}`}>
+                {order.status}
               </span>
             </div>
-            <span className="text-base font-bold text-gray-900 ml-3 flex-shrink-0">
-              ×{order.items[0].quantity}
-            </span>
-          </div>
-          {order.items.length > 1 && (
-            <div className="mt-3 pt-3 border-t border-gray-100">
-              <p className="text-sm text-primary-600 font-semibold">
-                +{order.items.length - 1} more item{order.items.length - 1 !== 1 ? 's' : ''}
-              </p>
+            <div className="flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+              <span className="text-sm text-gray-600 font-medium truncate">{order.username}</span>
+              <span className="text-xs text-gray-400 flex-shrink-0">· {timeAgo}</span>
             </div>
+          </div>
+
+          {/* Packed checkbox — large, right-aligned */}
+          {isPacked && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleCheck(order.orderId); }}
+              className="ml-3 flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl border-2 transition-all"
+              style={{ borderColor: isChecked ? '#22c55e' : '#d1d5db', background: isChecked ? '#dcfce7' : 'white' }}
+            >
+              {isChecked
+                ? <CheckSquare className="w-5 h-5 text-green-600" />
+                : <Square className="w-5 h-5 text-gray-400" />
+              }
+            </button>
           )}
         </div>
 
-        <div className="mt-auto pt-3 border-t border-gray-100">
-          <p className="text-sm text-gray-500 text-center font-medium">
-            Tap to view and manage order
-          </p>
-        </div>
+        {/* Row 2: product image strip */}
+        <button
+          onClick={() => router.push(`/collection-point/orders/${order.orderId}`)}
+          className="w-full text-left"
+        >
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1.5">
+              {previewItems.map((item: any, i: number) => (
+                <div key={i} className="w-10 h-10 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
+                  {PRODUCT_IMAGES[item.itemId] ? (
+                    <img
+                      src={PRODUCT_IMAGES[item.itemId]}
+                      alt={item.itemName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Package className="w-4 h-4 text-gray-400" />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-800 truncate">
+                {order.items[0].itemName}
+                {order.items[0].quantity > 1 && (
+                  <span className="text-gray-400 font-normal"> ×{order.items[0].quantity}</span>
+                )}
+              </p>
+              {extraCount > 0 && (
+                <p className="text-xs text-primary-600 font-semibold">+{extraCount} more item{extraCount > 1 ? 's' : ''}</p>
+              )}
+            </div>
+            <ChevronRight className="w-5 h-5 text-gray-300 flex-shrink-0" />
+          </div>
+        </button>
       </div>
     </div>
   );
@@ -355,11 +409,11 @@ const OrderCard = memo(({ order, router, isChecked, onToggleCheck }: {
 
 OrderCard.displayName = 'OrderCard';
 
-function getStatusColor(status: string) {
-  const colors: Record<string, string> = {
-    confirmed: 'bg-yellow-100 text-yellow-800',
-    packed: 'bg-blue-100 text-blue-800',
-    collected: 'bg-green-100 text-green-800',
+function getStatusPill(status: string) {
+  const map: Record<string, string> = {
+    confirmed: 'bg-amber-100 text-amber-700',
+    packed:    'bg-blue-100 text-blue-700',
+    collected: 'bg-green-100 text-green-700',
   };
-  return colors[status] || 'bg-gray-100 text-gray-800';
+  return map[status] ?? 'bg-gray-100 text-gray-700';
 }
