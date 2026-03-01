@@ -3,13 +3,13 @@
 import { usePaginatedQuery, useQuery, useMutation } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import {
-  Loader2, Package, User, MapPin, ShoppingCart,
-  CheckCircle, ChevronDown, ChevronRight, Calendar,
-  CheckSquare, Square,
+  Loader2, Package, User, MapPin,
+  CheckCircle, ChevronRight, ChevronDown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useCollectionPoint, useUser } from '../../components/UserContext';
-import { useRouter } from 'next/navigation';
+import { buildBagPlan } from '../../lib/bagPlan';
+import { useCollectionPoint, useUser, useUserLoaded } from '../../components/UserContext';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState, memo } from 'react';
 
 const PAGE_SIZE = 40;
@@ -29,22 +29,32 @@ const PRODUCT_IMAGES: Record<string, string> = {
 
 export default function CollectionPointPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const user = useUser();
+  const loaded = useUserLoaded();
   const collectionPoint = useCollectionPoint();
-  const [selectedStatus, setSelectedStatus] = useState<'confirmed' | 'packed' | 'collected'>('confirmed');
-  const [checkedOrders, setCheckedOrders] = useState<Set<string>>(new Set());
+  const [selectedStatus, setSelectedStatus] = useState<'confirmed' | 'packed' | 'collected'>(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'packed' || tab === 'collected') return tab;
+    return 'confirmed';
+  });
+  const [bulkMode, setBulkMode] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [packListOpen, setPackListOpen] = useState(true);
+  const [today, setToday] = useState('');
+  useEffect(() => {
+    setToday(new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }));
+  }, []);
   const updateStatus = useMutation(api.orders.updateStatus);
 
   useEffect(() => {
+    if (!loaded) return;
     if (!user || user.role !== 'collection_point_manager') {
       router.push('/login');
     }
-  }, [user, router]);
+  }, [user, router, loaded]);
 
   useEffect(() => {
-    setCheckedOrders(new Set());
+    setBulkMode(false);
   }, [selectedStatus]);
 
   const { results: orders, status: loadStatus, loadMore } = usePaginatedQuery(
@@ -58,46 +68,35 @@ export default function CollectionPointPage() {
     collectionPoint ? { collectionPoint } : 'skip'
   );
 
-  const confirmedItemsList = useQuery(
-    api.orders.getConfirmedItemsSummary,
-    collectionPoint ? { collectionPoint } : 'skip'
-  );
 
-  const handleCollectionCompleted = async () => {
-    if (checkedOrders.size === 0 || isProcessing) return;
+  const handleMarkOne = async (orderId: string) => {
+    try {
+      await updateStatus({ orderId, status: 'collected' });
+      toast.success('Order marked as collected!');
+    } catch {
+      toast.error('Failed to update order. Please try again.');
+    }
+  };
+
+  const handleMarkAll = async () => {
+    if (isProcessing) return;
     setIsProcessing(true);
     try {
-      await Promise.all(
-        Array.from(checkedOrders).map(orderId =>
-          updateStatus({ orderId, status: 'collected' })
-        )
-      );
-      setCheckedOrders(new Set());
-      toast.success(`Marked ${checkedOrders.size} order${checkedOrders.size > 1 ? 's' : ''} as collected!`);
-    } catch (error) {
+      await Promise.all(orders.map((o: any) => updateStatus({ orderId: o.orderId, status: 'collected' })));
+      setBulkMode(false);
+      toast.success(`Marked ${orders.length} order${orders.length > 1 ? 's' : ''} as collected!`);
+    } catch {
       toast.error('Failed to update orders. Please try again.');
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleSelectAll = () => {
-    if (checkedOrders.size === orders.length) {
-      setCheckedOrders(new Set());
-    } else {
-      setCheckedOrders(new Set(orders.map((o: any) => o.orderId)));
-    }
-  };
-
-  const today = new Date().toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric',
-  });
-
   if (counts === undefined) {
     return (
       <div className="pb-24 sm:pb-6">
         {/* Skeleton header */}
-        <div className="bg-primary-600 px-4 pt-6 pb-8">
+        <div className="bg-primary-600 px-4 pt-4 pb-8">
           <div className="h-7 bg-white/20 rounded-lg w-56 mb-2 animate-pulse" />
           <div className="h-4 bg-white/10 rounded w-36 animate-pulse" />
         </div>
@@ -115,7 +114,6 @@ export default function CollectionPointPage() {
 
   const isSwitchingFilter = loadStatus === 'LoadingFirstPage';
   const stats = counts ?? { confirmed: 0, packed: 0, collected: 0, total: 0 };
-  const allSelected = orders.length > 0 && checkedOrders.size === orders.length;
 
   const tabs = [
     { key: 'confirmed', label: 'Confirmed', count: stats.confirmed },
@@ -124,40 +122,35 @@ export default function CollectionPointPage() {
   ] as const;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-32 sm:pb-6">
+    <div className="bg-gray-50 pb-24 sm:pb-6">
 
       {/* ── HERO HEADER ─────────────────────────────────────── */}
-      <div className="bg-gradient-to-br from-primary-600 to-primary-700 px-4 pt-3 pb-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center gap-2 mb-0.5">
-            <MapPin className="w-4 h-4 text-white/80" />
-            <h1 className="text-lg font-bold text-white truncate">{collectionPoint}</h1>
+      <div className="bg-gradient-to-br from-primary-600 to-primary-700 px-4 pt-4 pb-8">
+        <div className="flex items-center gap-1.5 min-w-0">
+            <MapPin className="w-4 h-4 text-white/80 flex-shrink-0" />
+            <h1 className="text-base font-bold text-white truncate">{collectionPoint}</h1>
+            <span className="text-white/40 text-xs flex-shrink-0">·</span>
+            <p className="text-xs text-white/60 flex-shrink-0">{today}</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Calendar className="w-3.5 h-3.5 text-white/60" />
-            <p className="text-xs text-white/70">{today}</p>
-          </div>
-        </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 -mt-4">
+      <div className="px-4 -mt-5">
 
         {/* ── STATUS TABS ──────────────────────────────────── */}
-        <div className="bg-white rounded-2xl shadow-md p-1 mb-3 flex gap-1">
+        <div className="bg-white rounded-xl shadow-md p-1 mb-2 flex gap-1">
           {tabs.map(({ key, label, count }) => (
             <button
               key={key}
               onClick={() => setSelectedStatus(key)}
-              className={`flex-1 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 px-2 rounded-xl transition-all text-sm font-semibold ${
+              className={`flex-1 flex flex-row items-center justify-center gap-1.5 py-1.5 px-1 rounded-lg transition-all text-xs font-semibold ${
                 selectedStatus === key
                   ? 'bg-primary-600 text-white shadow-sm'
                   : 'text-gray-500 hover:bg-gray-50'
               }`}
             >
-              <span className="hidden sm:inline">{label}</span>
-              <span className="sm:hidden text-xs font-bold">{label.slice(0, 4)}</span>
-              <span className={`text-base sm:text-sm font-bold tabular-nums ${
-                selectedStatus === key ? 'text-white' : 'text-gray-800'
+              <span>{label}</span>
+              <span className={`font-bold tabular-nums px-1.5 py-0.5 rounded-full text-xs ${
+                selectedStatus === key ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
               }`}>
                 {count}
               </span>
@@ -165,92 +158,43 @@ export default function CollectionPointPage() {
           ))}
         </div>
 
-        {/* ── PACK LIST (confirmed tab only) ───────────────── */}
-        {selectedStatus === 'confirmed' && confirmedItemsList !== undefined && confirmedItemsList.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-sm mb-3 overflow-hidden">
-            <button
-              onClick={() => setPackListOpen(o => !o)}
-              className="w-full flex items-center justify-between px-3 py-2.5"
-            >
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="w-4 h-4 text-primary-500" />
-                <span className="font-bold text-gray-900 text-sm">Pack List</span>
-                <span className="text-xs bg-primary-100 text-primary-700 font-bold px-2 py-0.5 rounded-full">
-                  {confirmedItemsList.length} products
-                </span>
-              </div>
-              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${packListOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {packListOpen && (
-              <div className="px-3 pb-3 flex flex-wrap gap-1.5">
-                {confirmedItemsList.map((item: any) => (
-                  <span
-                    key={item.itemId}
-                    className="inline-flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-full px-2.5 py-1 text-xs font-semibold text-gray-800"
-                  >
-                    <span className="text-gray-400 text-xs">{item.itemId}</span>
-                    {item.itemName}
-                    <span className="bg-primary-100 text-primary-700 font-bold text-xs px-1.5 py-0.5 rounded-full">
-                      ×{item.quantity}
-                    </span>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {selectedStatus === 'confirmed' && confirmedItemsList === undefined && (
-          <div className="flex justify-center py-3 mb-4">
-            <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
-          </div>
-        )}
 
         {/* ── ORDER LIST HEADER ─────────────────────────────── */}
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-1.5">
           <p className="text-sm font-semibold text-gray-500">
             {isSwitchingFilter ? 'Loading…' : `${loadStatus === 'CanLoadMore' ? `${orders.length}+` : orders.length} orders`}
           </p>
-          {selectedStatus === 'packed' && orders.length > 0 && (
+          {selectedStatus === 'packed' && orders.length > 1 && (
             <button
-              onClick={handleSelectAll}
-              className="flex items-center gap-1.5 text-sm font-semibold text-primary-600 hover:text-primary-700"
+              onClick={() => setBulkMode(v => !v)}
+              className={`text-sm font-semibold transition-colors ${
+                bulkMode ? 'text-red-500 hover:text-red-600' : 'text-primary-600 hover:text-primary-700'
+              }`}
             >
-              {allSelected
-                ? <><CheckSquare className="w-4 h-4" /> Deselect All</>
-                : <><Square className="w-4 h-4" /> Select All ({orders.length})</>
-              }
+              {bulkMode ? 'Cancel' : `Select All (${orders.length})`}
             </button>
           )}
         </div>
 
         {/* ── ORDER CARDS ──────────────────────────────────── */}
         {isSwitchingFilter ? (
-          <div className="flex justify-center py-16">
-            <Loader2 className="w-8 h-8 text-primary-400 animate-spin" />
+          <div className="flex justify-center py-10">
+            <Loader2 className="w-7 h-7 text-primary-400 animate-spin" />
           </div>
         ) : orders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl shadow-sm">
-            <Package className="w-16 h-16 text-gray-200 mb-3" />
-            <p className="text-base font-semibold text-gray-400">No {selectedStatus} orders</p>
+          <div className="flex flex-col items-center justify-center py-10 bg-white rounded-2xl shadow-sm">
+            <Package className="w-12 h-12 text-gray-200 mb-2" />
+            <p className="text-sm font-semibold text-gray-400">No {selectedStatus} orders</p>
           </div>
         ) : (
           <>
-            <div className="space-y-2 sm:grid sm:grid-cols-2 sm:gap-2 sm:space-y-0">
+            <div className="space-y-3 sm:grid sm:grid-cols-3 sm:gap-3 sm:space-y-0">
               {orders.map((order: any) => (
                 <OrderCard
                   key={order.orderId}
                   order={order}
                   router={router}
-                  isChecked={checkedOrders.has(order.orderId)}
-                  onToggleCheck={(orderId: string) => {
-                    setCheckedOrders(prev => {
-                      const next = new Set(prev);
-                      next.has(orderId) ? next.delete(orderId) : next.add(orderId);
-                      return next;
-                    });
-                  }}
+                  onMarkCollected={handleMarkOne}
                 />
               ))}
             </div>
@@ -275,13 +219,13 @@ export default function CollectionPointPage() {
         )}
       </div>
 
-      {/* ── MARK AS COLLECTED CTA ────────────────────────── */}
-      {selectedStatus === 'packed' && checkedOrders.size > 0 && (
+      {/* ── BULK MARK AS COLLECTED CTA ───────────────────── */}
+      {selectedStatus === 'packed' && bulkMode && (
         <div className="fixed bottom-16 sm:bottom-0 left-0 right-0 z-40 animate-slide-up">
           <div className="bg-white border-t border-gray-100 shadow-2xl px-4 py-3">
             <div className="max-w-4xl mx-auto">
               <button
-                onClick={handleCollectionCompleted}
+                onClick={handleMarkAll}
                 disabled={isProcessing}
                 className={`w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-bold text-lg text-white transition-all ${
                   isProcessing
@@ -290,9 +234,7 @@ export default function CollectionPointPage() {
                 }`}
               >
                 <CheckCircle className="w-6 h-6" />
-                {isProcessing
-                  ? 'Processing…'
-                  : `Mark ${checkedOrders.size} Order${checkedOrders.size > 1 ? 's' : ''} as Collected`}
+                {isProcessing ? 'Processing…' : `Mark All ${orders.length} Orders as Collected`}
               </button>
             </div>
           </div>
@@ -303,106 +245,157 @@ export default function CollectionPointPage() {
 }
 
 // ── ORDER CARD ───────────────────────────────────────────
-const OrderCard = memo(({ order, router, isChecked, onToggleCheck }: {
+const OrderCard = memo(({ order, router, onMarkCollected }: {
   order: any;
   router: any;
-  isChecked: boolean;
-  onToggleCheck: (orderId: string) => void;
+  onMarkCollected: (orderId: string) => void;
 }) => {
   const isPacked = order.status === 'packed';
   const previewItems = order.items.slice(0, 3);
   const extraCount = order.items.length - previewItems.length;
 
-  const timeAgo = (() => {
+  const [timeAgo, setTimeAgo] = useState('');
+  useEffect(() => {
     const diff = Date.now() - order.createdAt;
     const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins}m ago`;
+    if (mins < 1) { setTimeAgo('just now'); return; }
+    if (mins < 60) { setTimeAgo(`${mins}m ago`); return; }
     const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    return new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  })();
+    if (hrs < 24) { setTimeAgo(`${hrs}h ago`); return; }
+    setTimeAgo(new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+  }, [order.createdAt]);
+
+  const [packingPct, setPackingPct] = useState<number | null>(null);
+  useEffect(() => {
+    if (order.status !== 'confirmed') return;
+    try {
+      const saved = localStorage.getItem(`packed-items-${order.orderId}`);
+      if (!saved) return;
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed) || !Array.isArray(parsed[0])) return;
+      const map = new Map<number, number>(parsed);
+      let totalQty = 0;
+      let packedQtySum = 0;
+      order.items.forEach((item: any, i: number) => {
+        totalQty += item.quantity;
+        packedQtySum += Math.min(item.quantity, map.get(i) ?? 0);
+      });
+      if (totalQty > 0 && packedQtySum > 0) {
+        setPackingPct(Math.round((packedQtySum / totalQty) * 100));
+      }
+    } catch {}
+  }, [order.orderId, order.status]);
+
+  const isConfirmed = order.status === 'confirmed';
 
   return (
     <div
-      className={`bg-white rounded-2xl shadow-sm border transition-all ${
-        isChecked
-          ? 'border-green-300 bg-green-50 shadow-md'
+      onClick={() => router.push(`/collection-point/orders/${order.orderId}`)}
+      className={`bg-white rounded-2xl shadow-sm border transition-all cursor-pointer active:scale-[0.99] overflow-hidden ${
+        packingPct !== null && isConfirmed
+          ? 'border-orange-200'
           : 'border-transparent hover:shadow-md'
       }`}
     >
       <div className="p-4">
-        {/* Row 1: order # + customer + time */}
+        {/* Row 1: order # + status + customer + time */}
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-sm font-bold text-gray-900">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-base font-bold text-gray-900">
                 #{order.orderId.split('-')[1]}
               </span>
-              <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${getStatusPill(order.status)}`}>
+              <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full ${getStatusPill(order.status)}`}>
                 {order.status}
               </span>
             </div>
             <div className="flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-              <span className="text-sm text-gray-600 font-medium truncate">{order.username}</span>
+              <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
+              <span className="text-sm font-semibold text-gray-700 truncate">{order.username}</span>
               <span className="text-xs text-gray-400 flex-shrink-0">· {timeAgo}</span>
             </div>
           </div>
-
-          {/* Packed checkbox — large, right-aligned */}
-          {isPacked && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onToggleCheck(order.orderId); }}
-              className="ml-3 flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-xl border-2 transition-all"
-              style={{ borderColor: isChecked ? '#22c55e' : '#d1d5db', background: isChecked ? '#dcfce7' : 'white' }}
-            >
-              {isChecked
-                ? <CheckSquare className="w-5 h-5 text-green-600" />
-                : <Square className="w-5 h-5 text-gray-400" />
-              }
-            </button>
-          )}
+          <ChevronRight className="w-5 h-5 text-gray-300 flex-shrink-0 mt-0.5" />
         </div>
 
-        {/* Row 2: product image strip */}
-        <button
-          onClick={() => router.push(`/collection-point/orders/${order.orderId}`)}
-          className="w-full text-left"
-        >
-          <div className="flex items-center gap-2">
-            <div className="flex gap-1.5">
-              {previewItems.map((item: any, i: number) => (
-                <div key={i} className="w-10 h-10 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
-                  {PRODUCT_IMAGES[item.itemId] ? (
-                    <img
-                      src={PRODUCT_IMAGES[item.itemId]}
-                      alt={item.itemName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Package className="w-4 h-4 text-gray-400" />
-                    </div>
-                  )}
-                </div>
+        {/* Row 2: product image strip + item name */}
+        <div className="flex items-center gap-3">
+          <div className="flex gap-2">
+            {previewItems.map((item: any, i: number) => (
+              <div key={i} className="w-12 h-12 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
+                {PRODUCT_IMAGES[item.itemId] ? (
+                  <img
+                    src={PRODUCT_IMAGES[item.itemId]}
+                    alt={item.itemName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Package className="w-5 h-5 text-gray-400" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-800 truncate">
+              {order.items[0].itemName}
+              {order.items[0].quantity > 1 && (
+                <span className="text-gray-400 font-normal"> ×{order.items[0].quantity}</span>
+              )}
+            </p>
+            {extraCount > 0 && (
+              <p className="text-xs text-primary-600 font-semibold mt-0.5">+{extraCount} more item{extraCount > 1 ? 's' : ''}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Bag plan summary — confirmed orders only */}
+        {isConfirmed && (() => {
+          const bags = buildBagPlan(order.items);
+          return (
+            <div className="mt-3 flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs text-gray-400 font-medium">{bags.length} bag{bags.length !== 1 ? 's' : ''}:</span>
+              {bags.map((bag, i) => (
+                <span
+                  key={i}
+                  className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border ${bag.group.color} ${bag.group.border} text-gray-700`}
+                >
+                  <span>{bag.group.emoji}</span>
+                  <span>×{bag.items.reduce((s, it) => s + it.quantity, 0)}</span>
+                </span>
               ))}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-800 truncate">
-                {order.items[0].itemName}
-                {order.items[0].quantity > 1 && (
-                  <span className="text-gray-400 font-normal"> ×{order.items[0].quantity}</span>
-                )}
-              </p>
-              {extraCount > 0 && (
-                <p className="text-xs text-primary-600 font-semibold">+{extraCount} more item{extraCount > 1 ? 's' : ''}</p>
-              )}
-            </div>
-            <ChevronRight className="w-5 h-5 text-gray-300 flex-shrink-0" />
-          </div>
-        </button>
+          );
+        })()}
+
+        {/* Mark as Collected button — packed orders only */}
+        {isPacked && (
+          <button
+            onClick={e => { e.stopPropagation(); onMarkCollected(order.orderId); }}
+            className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 bg-green-500 hover:bg-green-600 active:bg-green-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm"
+          >
+            <CheckCircle className="w-4 h-4" />
+            Mark as Collected
+          </button>
+        )}
       </div>
+
+      {/* Packing progress bar — confirmed + partially packed */}
+      {isConfirmed && packingPct !== null && (
+        <div className="px-4 pb-3 -mt-1">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-semibold text-orange-500">Packing in progress</span>
+            <span className="text-xs font-bold text-orange-600">{packingPct}%</span>
+          </div>
+          <div className="w-full bg-orange-100 rounded-full h-1.5">
+            <div
+              className="h-1.5 rounded-full bg-orange-400 transition-all duration-300"
+              style={{ width: `${packingPct}%` }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 });

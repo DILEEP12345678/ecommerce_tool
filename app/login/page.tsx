@@ -5,12 +5,13 @@ import { Loader2, MapPin, User, Shield, Package } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { useSetUser, useUser } from '../../components/UserContext';
+import { useSetUser, useUser, useUserLoaded } from '../../components/UserContext';
 import { api } from '../../convex/_generated/api';
 
 export default function LoginPage() {
   const router = useRouter();
   const user = useUser();
+  const loaded = useUserLoaded();
   const setUser = useSetUser();
   const [selectedUser, setSelectedUser] = useState('');
   const [selectedCollectionPoint, setSelectedCollectionPoint] = useState('');
@@ -20,6 +21,7 @@ export default function LoginPage() {
 
   // Redirect if already logged in
   useEffect(() => {
+    if (!loaded) return;
     if (user) {
       if (user.role === 'admin') {
         router.push('/admin');
@@ -29,7 +31,7 @@ export default function LoginPage() {
         router.push('/store');
       }
     }
-  }, [user, router]);
+  }, [user, router, loaded]);
 
   const testUsers = [
     {

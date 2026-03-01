@@ -1,12 +1,13 @@
 'use client';
 
-import { useQuery, useMutation } from 'convex/react';
-import { api } from '../../../../convex/_generated/api';
-import { Loader2, Package, ArrowLeft, CheckCircle2, Minus, Plus, X } from 'lucide-react';
+import { useMutation, useQuery } from 'convex/react';
+import { ArrowLeft, CheckCircle2, Loader2, Package, ShoppingBag, X } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { useRouter, useParams } from 'next/navigation';
-import { useUser } from '../../../../components/UserContext';
-import { useEffect, useRef, useState } from 'react';
+import { useUser, useUserLoaded } from '../../../../components/UserContext';
+import { api } from '../../../../convex/_generated/api';
+import { buildBagPlan, type BagEntry } from '../../../../lib/bagPlan';
 
 // Product image mapping
 const PRODUCT_IMAGES: Record<string, string> = {
@@ -26,9 +27,9 @@ export default function OrderDetailPage() {
   const router = useRouter();
   const params = useParams();
   const user = useUser();
+  const loaded = useUserLoaded();
   const orderId = params.orderId as string;
   const [zoomedImage, setZoomedImage] = useState<{ src: string; alt: string } | null>(null);
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [packedQty, setPackedQty] = useState<Map<number, number>>(() => {
     if (typeof window === 'undefined') return new Map();
     try {
@@ -50,16 +51,6 @@ export default function OrderDetailPage() {
     localStorage.setItem(`packed-items-${orderId}`, JSON.stringify(Array.from(packedQty.entries())));
   }, [packedQty, orderId]);
 
-  const updatePackedQty = (index: number, delta: number, maxQty: number) => {
-    setPackedQty(prev => {
-      const next = new Map(prev);
-      const current = next.get(index) ?? 0;
-      const updated = Math.min(maxQty, Math.max(0, current + delta));
-      next.set(index, updated);
-      return next;
-    });
-  };
-
   const order = useQuery(
     api.orders.getByOrderId,
     orderId ? { orderId } : 'skip'
@@ -67,10 +58,22 @@ export default function OrderDetailPage() {
   const updateStatus = useMutation(api.orders.updateStatus);
 
   useEffect(() => {
+    if (!loaded) return;
     if (!user || user.role !== 'collection_point_manager') {
       router.push('/login');
     }
-  }, [user, router]);
+  }, [user, router, loaded]);
+
+  const [timeAgo, setTimeAgo] = useState('');
+  useEffect(() => {
+    if (!order) return;
+    const diff = Date.now() - order.createdAt;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) { setTimeAgo(`${mins}m ago`); return; }
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) { setTimeAgo(`${hrs}h ago`); return; }
+    setTimeAgo(`${Math.floor(hrs / 24)}d ago`);
+  }, [order]);
 
   if (order === undefined) {
     return (
@@ -97,6 +100,9 @@ export default function OrderDetailPage() {
       if (newStatus === 'packed') {
         localStorage.removeItem(`packed-items-${order.orderId}`);
         setPackedQty(new Map());
+        router.push('/collection-point');
+      } else if (newStatus === 'collected') {
+        router.push('/collection-point?tab=packed');
       }
     } catch {
       toast.error('Failed to update order status. Please try again.');
@@ -112,57 +118,42 @@ export default function OrderDetailPage() {
     (_: any, i: number) => (packedQty.get(i) ?? 0) >= order.items[i].quantity
   ).length;
 
-  const initials = order.username
-    .split(' ')
-    .map((w: string) => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-
-  const timeAgo = (() => {
-    const diff = Date.now() - order.createdAt;
-    const mins = Math.floor(diff / 60000);
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    return `${Math.floor(hrs / 24)}d ago`;
-  })();
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-36 sm:pb-28">
-      {/* Sticky top bar */}
-      <div className="sticky top-0 z-10 bg-white shadow-sm px-4 py-3 flex items-center gap-3">
+    <div className="flex flex-col bg-gray-50 h-[calc(100vh-7.5rem)] sm:h-[calc(100vh-3.5rem)]">
+      {/* Fixed top bar */}
+      <div className="flex-shrink-0 bg-white shadow-sm px-4 py-2.5 flex items-center gap-3">
         <button
           onClick={() => router.push('/collection-point')}
-          className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors -ml-1 flex-shrink-0"
+          className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors -ml-1 flex-shrink-0"
           aria-label="Back to dashboard"
         >
           <ArrowLeft className="w-5 h-5 text-gray-700" />
         </button>
-        <h1 className="flex-1 text-lg font-bold text-gray-900 truncate">
-          Order #{order.orderId.split('-')[1]}
-        </h1>
-        <span className={`px-3 py-1 text-sm font-bold rounded-full flex-shrink-0 ${getStatusBadge(order.status)}`}>
-          {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-base font-bold text-gray-900">
+              Order #{order.orderId.split('-')[1]}
+            </h1>
+            <span className={`px-2.5 py-0.5 text-xs font-bold rounded-full flex-shrink-0 ${getStatusBadge(order.status)}`}>
+              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 truncate">{order.username} · {timeAgo}</p>
+        </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 pt-4">
-        {/* Customer info strip */}
-        <div className="flex items-center gap-3 bg-white rounded-2xl shadow-sm px-4 py-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
-            <span className="text-sm font-bold text-primary-700">{initials}</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-gray-900 truncate">{order.username}</p>
-            <p className="text-xs text-gray-500 truncate">{order.collectionPoint}</p>
-          </div>
-          <p className="text-xs text-gray-400 flex-shrink-0">{timeAgo}</p>
-        </div>
+      {/* Single scrollable content area */}
+      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar">
+      <div className="max-w-5xl mx-auto px-6 py-4">
+      <div className="flex gap-4 items-start">
+
+        {/* ── LEFT: items section ─────────────────────────── */}
+        <div className="flex-[3] min-w-0 space-y-3">
 
         {/* All-packed success banner */}
         {order.status === 'confirmed' && allComplete && (
-          <div className="flex items-center gap-3 bg-green-50 border-2 border-green-200 rounded-2xl px-4 py-3 mb-4 animate-fade-in">
+          <div className="flex items-center gap-3 bg-green-50 border-2 border-green-200 rounded-2xl px-4 py-3 animate-fade-in">
             <CheckCircle2 className="w-6 h-6 text-green-500 flex-shrink-0" />
             <div>
               <p className="text-sm font-bold text-green-800">All items packed!</p>
@@ -171,20 +162,63 @@ export default function OrderDetailPage() {
           </div>
         )}
 
-        {/* Item cards */}
-        <div className="space-y-3">
-          {order.items.map((item: any, index: number) => {
+        {/* Bag plan — mobile only */}
+        {order.status === 'confirmed' && (() => {
+          const bagPlan = buildBagPlan(order.items);
+          return <BagPlanPanel bagPlan={bagPlan} className="sm:hidden" />;
+        })()}
+
+        {/* Items box */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
+            <Package className="w-4 h-4 text-primary-500" />
+            <h3 className="text-sm font-bold text-gray-900">Order Items</h3>
+            <span className="ml-auto text-xs bg-primary-100 text-primary-700 font-bold px-2 py-0.5 rounded-full">
+              {order.items.length} item{order.items.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="p-3 space-y-3">
+          {(() => {
+            // Build item → bag mapping once for all cards
+            const itemBagMap = new Map<string, Array<{ bagNo: number; qty: number; entry: BagEntry }>>();
+            if (order.status === 'confirmed') {
+              const bagPlan = buildBagPlan(order.items);
+              for (const bag of bagPlan) {
+                for (const bagItem of bag.items) {
+                  if (!itemBagMap.has(bagItem.itemId)) itemBagMap.set(bagItem.itemId, []);
+                  itemBagMap.get(bagItem.itemId)!.push({ bagNo: bag.bagNo, qty: bagItem.quantity, entry: bag });
+                }
+              }
+            }
+            // Sort by lowest bag number; preserve originalIndex so packedQty stays correct
+            const sortedItems = order.items
+              .map((item: any, idx: number) => ({ item, originalIndex: idx }))
+              .sort((a: any, b: any) => {
+                const aMin = Math.min(...(itemBagMap.get(a.item.itemId)?.map((x: any) => x.bagNo) ?? [Infinity]));
+                const bMin = Math.min(...(itemBagMap.get(b.item.itemId)?.map((x: any) => x.bagNo) ?? [Infinity]));
+                return aMin - bMin;
+              });
+            return sortedItems.map(({ item, originalIndex: index }: any) => {
             const packed = packedQty.get(index) ?? 0;
             const total = item.quantity;
             const isComplete = packed >= total;
-            const pct = total > 0 ? Math.round((packed / total) * 100) : 0;
+            const pct = total > 0 ? packed / total : 0;
+            const bagAssignments = itemBagMap.get(item.itemId) ?? [];
+
+            const tileStyle = order.status !== 'confirmed' || packed === 0
+              ? 'bg-white border-transparent'
+              : isComplete
+              ? 'bg-green-50 border-green-300'
+              : pct <= 0.33
+              ? 'bg-red-50 border-red-200'
+              : pct <= 0.66
+              ? 'bg-orange-50 border-orange-200'
+              : 'bg-yellow-50 border-yellow-200';
 
             return (
               <div
                 key={index}
-                className={`bg-white rounded-2xl shadow-sm border-2 overflow-hidden transition-all duration-200 ${
-                  isComplete ? 'border-green-300' : 'border-transparent'
-                }`}
+                className={`rounded-2xl shadow-sm border-2 overflow-hidden transition-all duration-300 ${tileStyle}`}
               >
                 <div className="p-4">
                   <div className="flex items-start gap-4">
@@ -217,6 +251,20 @@ export default function OrderDetailPage() {
                             {item.itemName}
                           </p>
                           <p className="text-xs text-gray-400 mt-0.5">{item.itemId}</p>
+                          {/* Bag indicators */}
+                          {bagAssignments.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {bagAssignments.map((a, i) => (
+                                <span
+                                  key={i}
+                                  className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border ${a.entry.group.color} ${a.entry.group.border} text-gray-700`}
+                                >
+                                  {a.entry.group.emoji} Bag {a.bagNo}
+                                  {bagAssignments.length > 1 && <span className="text-gray-500 font-normal">×{a.qty}</span>}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                         {isComplete && (
                           <CheckCircle2 className="w-6 h-6 text-green-500 flex-shrink-0 mt-0.5" />
@@ -229,85 +277,83 @@ export default function OrderDetailPage() {
                     </div>
                   </div>
 
-                  {/* Progress + stepper — confirmed only */}
+                  {/* Quantity circles — confirmed only */}
                   {order.status === 'confirmed' && (
-                    <div className="mt-4">
-                      {/* Progress bar */}
-                      <div className="w-full bg-gray-100 rounded-full h-2 mb-3">
-                        <div
-                          className={`h-2 rounded-full transition-all duration-300 ${
-                            pct === 0
-                              ? 'bg-transparent'
-                              : pct <= 33
-                              ? 'bg-red-400'
-                              : pct <= 66
-                              ? 'bg-orange-400'
-                              : pct < 100
-                              ? 'bg-yellow-400'
-                              : 'bg-green-500'
-                          }`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-
-                      {/* Stepper row */}
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-500 font-medium">{pct}% packed</span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => updatePackedQty(index, -1, total)}
-                            disabled={packed === 0}
-                            className="w-12 h-12 flex items-center justify-center rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                            aria-label="Decrease packed quantity"
+                    <div className="mt-3 flex flex-wrap gap-2 items-center">
+                      {Array.from({ length: total }).map((_, dotIdx) => {
+                        const isFilled = dotIdx < packed;
+                        const posPct = total === 1 ? 100 : (dotIdx / (total - 1)) * 100;
+                        const color = posPct <= 25 ? '#ef4444'
+                          : posPct <= 50 ? '#f97316'
+                          : posPct <= 75 ? '#facc15'
+                          : '#22c55e';
+                        return (
+                          <div
+                            key={dotIdx}
+                            onClick={() => {
+                              const newCount = isFilled ? dotIdx : dotIdx + 1;
+                              setPackedQty(prev => {
+                                const next = new Map(prev);
+                                next.set(index, newCount);
+                                return next;
+                              });
+                            }}
+                            role="button"
+                            aria-label={`Unit ${dotIdx + 1}: ${isFilled ? 'packed' : 'not packed'}`}
+                            style={{
+                              width: '24px',
+                              height: '24px',
+                              minWidth: '24px',
+                              maxWidth: '24px',
+                              borderRadius: '50%',
+                              border: `2px solid ${color}`,
+                              backgroundColor: isFilled ? color : '#fff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              fontWeight: 700,
+                              fontSize: '10px',
+                              color: isFilled ? '#fff' : color,
+                              boxSizing: 'border-box',
+                              cursor: 'pointer',
+                              userSelect: 'none',
+                            }}
                           >
-                            <Minus className="w-5 h-5" />
-                          </button>
-                          <div className="flex items-center gap-1.5 justify-center">
-                            <input
-                              type="number"
-                              min={0}
-                              max={total}
-                              value={packed}
-                              ref={el => { inputRefs.current[index] = el; }}
-                              onChange={e => {
-                                const val = Math.min(total, Math.max(0, Number(e.target.value)));
-                                setPackedQty(prev => {
-                                  const next = new Map(prev);
-                                  next.set(index, isNaN(val) ? 0 : val);
-                                  return next;
-                                });
-                              }}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') {
-                                  const next = inputRefs.current[index + 1];
-                                  if (next) { next.focus(); next.select(); }
-                                }
-                              }}
-                              className="w-11 text-center text-base font-bold text-gray-900 border-2 border-gray-200 rounded-xl py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-400"
-                            />
-                            <span className="text-sm font-semibold text-gray-400">/ {total}</span>
+                            {dotIdx + 1}
                           </div>
-                          <button
-                            onClick={() => updatePackedQty(index, 1, total)}
-                            disabled={packed >= total}
-                            className="w-12 h-12 flex items-center justify-center rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                            aria-label="Increase packed quantity"
-                          >
-                            <Plus className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </div>
+                        );
+                      })}
+                      <span className="text-sm font-semibold text-gray-400 ml-1">{packed}/{total}</span>
                     </div>
                   )}
                 </div>
               </div>
             );
-          })}
-        </div>
-      </div>
+            });
+          })()}
+          </div>
+        </div>{/* end items box */}
 
-      {/* Sticky footer action bar */}
-      <div className="fixed bottom-16 sm:bottom-0 left-0 right-0 bg-white border-t border-gray-100 shadow-lg px-4 py-3 z-10">
+        </div>{/* end left column */}
+
+        {/* RIGHT: sticky bag plan (sm+ only) */}
+        {order.status === 'confirmed' && (() => {
+          const bagPlan = buildBagPlan(order.items);
+          if (bagPlan.length === 0) return null;
+          return (
+            <div className="hidden sm:block flex-[2] sticky top-0">
+              <BagPlanPanel bagPlan={bagPlan} />
+            </div>
+          );
+        })()}
+
+      </div>{/* end flex */}
+      </div>{/* end max-w */}
+      </div>{/* end scrollable */}
+
+      {/* Footer action bar — fixed at bottom of flex column */}
+      <div className="flex-shrink-0 bg-white border-t border-gray-100 shadow-lg px-4 py-3">
         <div className="max-w-2xl mx-auto">
           {order.status === 'confirmed' && (
             <div className="flex flex-col gap-2">
@@ -331,20 +377,12 @@ export default function OrderDetailPage() {
           )}
 
           {order.status === 'packed' && (
-            <div className="flex gap-3">
-              <button
-                onClick={() => handleStatusChange('confirmed')}
-                className="flex-1 py-4 bg-gray-100 hover:bg-gray-200 active:scale-[0.98] text-gray-700 rounded-xl text-sm font-semibold transition-all"
-              >
-                Move Back
-              </button>
-              <button
-                onClick={() => handleStatusChange('collected')}
-                className="flex-[2] py-4 bg-green-500 hover:bg-green-600 active:scale-[0.98] text-white rounded-xl text-base font-bold transition-all shadow-sm"
-              >
-                Mark Collected
-              </button>
-            </div>
+            <button
+              onClick={() => handleStatusChange('collected')}
+              className="w-full py-4 bg-green-500 hover:bg-green-600 active:scale-[0.98] text-white rounded-xl text-base font-bold transition-all shadow-sm"
+            >
+              Mark Collected
+            </button>
           )}
 
           {order.status === 'collected' && (
@@ -382,6 +420,45 @@ export default function OrderDetailPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function BagPlanPanel({ bagPlan, className = '' }: { bagPlan: BagEntry[]; className?: string }) {
+  if (bagPlan.length === 0) return null;
+  return (
+    <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden ${className}`}>
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100">
+        <ShoppingBag className="w-4 h-4 text-primary-500" />
+        <h3 className="text-sm font-bold text-gray-900">Bag Plan</h3>
+        <span className="ml-auto text-xs bg-primary-100 text-primary-700 font-bold px-2 py-0.5 rounded-full">
+          {bagPlan.length} bag{bagPlan.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+      <div className="divide-y divide-gray-50">
+        {bagPlan.map((bag) => (
+          <div key={bag.bagNo} className={`px-4 py-3 ${bag.group.color}`}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-base">{bag.group.emoji}</span>
+              <span className="text-sm font-bold text-gray-900">Bag {bag.bagNo}</span>
+              <span className={`ml-auto text-xs font-semibold px-2 py-0.5 rounded-full border ${bag.group.border} text-gray-600`}>
+                {bag.group.label}
+              </span>
+            </div>
+            <div className="space-y-1">
+              {bag.items.map((item: any, i: number) => (
+                <div key={i} className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-gray-700 font-medium truncate">{item.itemName}</span>
+                  <span className="text-xs font-bold text-gray-500 flex-shrink-0">×{item.quantity}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-2">
+              ~{bag.weightG >= 1000 ? `${(bag.weightG / 1000).toFixed(1)}kg` : `${bag.weightG}g`}
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

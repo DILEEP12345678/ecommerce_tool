@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 interface User {
   email: string;
@@ -12,11 +12,13 @@ interface User {
 interface UserContextType {
   user: User | null;
   setUser: (user: User | null) => void;
+  loaded: boolean;
 }
 
 const UserContext = createContext<UserContextType>({
   user: null,
   setUser: () => {},
+  loaded: false,
 });
 
 export function useUser() {
@@ -47,21 +49,23 @@ export function useSetUser() {
   return useContext(UserContext).setUser;
 }
 
+export function useUserLoaded() {
+  return useContext(UserContext).loaded;
+}
+
 export function UserProvider({ children }: { children: ReactNode }) {
-  // Read localStorage synchronously so the user is available on the very first render.
-  // This prevents page guards (useEffect checking !user) from firing before the
-  // saved session is loaded, which caused an immediate redirect back to /login.
-  const [user, setUser] = useState<User | null>(() => {
-    if (typeof window === 'undefined') return null;
+  const [user, setUser] = useState<User | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  // Load from localStorage only on the client, after hydration
+  useEffect(() => {
     try {
       const saved = localStorage.getItem('currentUser');
-      return saved ? (JSON.parse(saved) as User) : null;
-    } catch {
-      return null;
-    }
-  });
+      if (saved) setUser(JSON.parse(saved) as User);
+    } catch {}
+    setLoaded(true);
+  }, []);
 
-  // Save user to localStorage when it changes
   const handleSetUser = (newUser: User | null) => {
     setUser(newUser);
     if (newUser) {
@@ -72,7 +76,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <UserContext.Provider value={{ user, setUser: handleSetUser }}>
+    <UserContext.Provider value={{ user, setUser: handleSetUser, loaded }}>
       {children}
     </UserContext.Provider>
   );

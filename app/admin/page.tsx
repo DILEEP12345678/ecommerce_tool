@@ -3,7 +3,7 @@
 import { usePaginatedQuery, useQuery } from 'convex/react';
 import { api } from '../../convex/_generated/api';
 import { Loader2, Package, User, MapPin, Hash, ShoppingCart, ChevronDown } from 'lucide-react';
-import { useUser } from '../../components/UserContext';
+import { useUser, useUserLoaded } from '../../components/UserContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, memo } from 'react';
 
@@ -26,14 +26,16 @@ const PRODUCT_IMAGES: Record<string, string> = {
 export default function AdminPage() {
   const router = useRouter();
   const user = useUser();
+  const loaded = useUserLoaded();
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'confirmed' | 'packed' | 'collected'>('all');
   const [selectedCollectionPoint, setSelectedCollectionPoint] = useState<string>('all');
 
   useEffect(() => {
+    if (!loaded) return;
     if (!user || user.role !== 'admin') {
       router.push('/login');
     }
-  }, [user, router]);
+  }, [user, router, loaded]);
 
   const { results: orders, status: loadStatus, loadMore } = usePaginatedQuery(
     api.orders.listAllPaginated,

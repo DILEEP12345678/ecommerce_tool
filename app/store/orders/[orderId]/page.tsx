@@ -4,7 +4,7 @@ import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
 import { Loader2, Package, MapPin, ArrowLeft, Clock, CheckCircle2, Circle } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
-import { useUsername } from '../../../../components/UserContext';
+import { useUsername, useUserLoaded } from '../../../../components/UserContext';
 import { useEffect } from 'react';
 
 // Product image mapping
@@ -25,6 +25,7 @@ export default function OrderDetailPage() {
   const router = useRouter();
   const params = useParams();
   const username = useUsername();
+  const loaded = useUserLoaded();
   const orderId = params.orderId as string;
 
   const order = useQuery(
@@ -33,10 +34,11 @@ export default function OrderDetailPage() {
   );
 
   useEffect(() => {
+    if (!loaded) return;
     if (!username) {
       router.push('/login');
     }
-  }, [username, router]);
+  }, [username, router, loaded]);
 
   if (order === undefined) {
     return (

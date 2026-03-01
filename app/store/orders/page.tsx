@@ -3,7 +3,7 @@
 import { usePaginatedQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { ClipboardList, Loader2, Package, ChevronDown, MapPin } from 'lucide-react';
-import { useUsername } from '../../../components/UserContext';
+import { useUsername, useUserLoaded } from '../../../components/UserContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, memo } from 'react';
 
@@ -26,6 +26,7 @@ const PRODUCT_IMAGES: Record<string, string> = {
 export default function OrdersPage() {
   const router = useRouter();
   const username = useUsername();
+  const loaded = useUserLoaded();
   const { results: orders, status: loadStatus, loadMore } = usePaginatedQuery(
     api.orders.getByUsernamePaginated,
     username ? { username } : 'skip',
@@ -33,10 +34,11 @@ export default function OrdersPage() {
   );
 
   useEffect(() => {
+    if (!loaded) return;
     if (!username) {
       router.push('/login');
     }
-  }, [username, router]);
+  }, [username, router, loaded]);
 
   if (loadStatus === 'LoadingFirstPage') {
     return (
